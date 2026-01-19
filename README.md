@@ -1,5 +1,7 @@
 # Magpie - YouTube Summarizer
 
+> **Note:** This project is an experiment in vibe coding. 100% of the code was written by [Claude Code](https://claude.ai/code) and [OpenAI Codex](https://openai.com/index/openai-codex/).
+
 A Chrome extension that uses AI to generate summaries of YouTube video transcripts. Click the extension icon while watching any YouTube video to get an instant summary in a side panel.
 
 ## Features
