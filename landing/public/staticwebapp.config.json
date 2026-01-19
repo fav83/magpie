@@ -1,0 +1,38 @@
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/assets/*", "/content/*", "/*.{css,js,png,gif,ico,jpg,svg,json,woff,woff2,ttf,eot,map,md}"]
+  },
+  "mimeTypes": {
+    ".json": "application/json",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".map": "application/json",
+    ".md": "text/markdown; charset=utf-8",
+    ".html": "text/html; charset=utf-8"
+  },
+  "globalHeaders": {
+    "content-type": "text/html; charset=utf-8"
+  },
+  "routes": [
+    {
+      "route": "/privacy-policy",
+      "rewrite": "/privacy-policy/index.html",
+      "headers": {
+        "content-type": "text/html; charset=utf-8"
+      }
+    },
+    {
+      "route": "/*.html",
+      "headers": {
+        "content-type": "text/html; charset=utf-8"
+      }
+    },
+    {
+      "route": "/",
+      "headers": {
+        "content-type": "text/html; charset=utf-8"
+      }
+    }
+  ]
+}

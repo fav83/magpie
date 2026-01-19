@@ -1,0 +1,100 @@
+[
+  {
+    "id": "default-quick-summary",
+    "name": "Quick Summary",
+    "model": "openai/gpt-4o-mini",
+    "isSystem": true,
+    "text": "Summarize in 3-5 short bullet points:\n• What's the main topic?\n• What are the key points?\n• What's the takeaway?\n\nOne sentence per bullet. No preamble or introduction - start directly with the bullets.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-detailed-summary",
+    "name": "Detailed Summary",
+    "model": "openai/gpt-4o-mini",
+    "isSystem": false,
+    "text": "Summarize this video transcript clearly and thoroughly. Include:\n- The main topic and purpose\n- Key points and arguments\n- Any important details (names, numbers, tools, examples)\n- The conclusion or main takeaway\n\nBe concise but don't omit important information.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-tldr",
+    "name": "TLDR",
+    "model": "google/gemini-2.0-flash-lite-001",
+    "isSystem": false,
+    "text": "Give me the main point of this video in 30 words or less.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-quick-summary-spanish",
+    "name": "Quick Summary (Spanish)",
+    "model": "openai/gpt-4o-mini",
+    "isSystem": false,
+    "text": "Summarize in 3-5 short bullet points:\n• What's the main topic?\n• What are the key points?\n• What's the takeaway?\n\nOne sentence per bullet. No preamble or introduction - start directly with the bullets.\n\nIMPORTANT: Write the entire summary in Spanish, regardless of the transcript's language.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-quick-summary-chinese",
+    "name": "Quick Summary (Chinese)",
+    "model": "openai/gpt-4o-mini",
+    "isSystem": false,
+    "text": "Summarize in 3-5 short bullet points:\n• What's the main topic?\n• What are the key points?\n• What's the takeaway?\n\nOne sentence per bullet. No preamble or introduction - start directly with the bullets.\n\nIMPORTANT: Write the entire summary in Simplified Chinese, regardless of the transcript's language.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-quick-summary-polish",
+    "name": "Quick Summary (Polish)",
+    "model": "openai/gpt-4o-mini",
+    "isSystem": false,
+    "text": "Summarize in 3-5 short bullet points:\n• What's the main topic?\n• What are the key points?\n• What's the takeaway?\n\nOne sentence per bullet. No preamble or introduction - start directly with the bullets.\n\nIMPORTANT: Write the entire summary in Polish, regardless of the transcript's language.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-quick-brief",
+    "name": "Quick Brief",
+    "model": "openai/gpt-4o-mini",
+    "isSystem": false,
+    "text": "Give me a quick executive brief of this video in 4 short paragraphs:\n\n**Who/What**: Who is speaking and what is this about?\n**Key Message**: What's the main point or argument?\n**Why It Matters**: Why should someone care about this?\n**Bottom Line**: What's the one thing to remember or do?\n\nKeep each section to 2-3 sentences max.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-emoji-summary",
+    "name": "Emoji Summary",
+    "model": "google/gemini-2.0-flash-001",
+    "isSystem": false,
+    "text": "Summarize this video using emojis to highlight key concepts. Start each point with a relevant emoji. Keep it visual and scannable.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-explain-simply",
+    "name": "Explain Simply",
+    "model": "anthropic/claude-3.5-haiku",
+    "isSystem": false,
+    "text": "Explain this video's content as if I'm completely new to the topic. Use simple language and analogies.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-action-items",
+    "name": "Action Items",
+    "model": "google/gemini-2.0-flash-001",
+    "isSystem": false,
+    "text": "List the actionable steps or advice from this video. What should I do after watching?\n\n{{transcript}}"
+  },
+  {
+    "id": "default-qa",
+    "name": "Q&A",
+    "model": "openai/gpt-4o-mini",
+    "isSystem": false,
+    "text": "What are the 5 most important questions this video answers? Provide each question with its answer.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-timestamps",
+    "name": "Timestamps",
+    "model": "google/gemini-2.0-flash-lite-001",
+    "isSystem": false,
+    "text": "Break this transcript into logical sections with brief descriptions of what each part covers.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-tweet-thread",
+    "name": "Tweet Thread",
+    "model": "anthropic/claude-3.5-haiku",
+    "isSystem": false,
+    "text": "Turn this video into a Twitter/X thread format: hook + 3-5 tweets + conclusion.\n\n{{transcript}}"
+  },
+  {
+    "id": "default-study-notes",
+    "name": "Study Notes",
+    "model": "anthropic/claude-3.5-haiku",
+    "isSystem": false,
+    "text": "Create study notes from this video with definitions, concepts, and examples mentioned.\n\n{{transcript}}"
+  }
+]

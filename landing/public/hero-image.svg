@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" fill="none">
+  <!-- Background -->
+  <rect width="1200" height="675" fill="#f8fafc"/>
+
+  <!-- Browser Window -->
+  <rect x="50" y="30" width="1100" height="615" rx="12" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+
+  <!-- Browser Header -->
+  <rect x="50" y="30" width="1100" height="50" rx="12" fill="#f1f5f9"/>
+  <rect x="50" y="68" width="1100" height="12" fill="#f1f5f9"/>
+  <circle cx="80" cy="55" r="8" fill="#f87171"/>
+  <circle cx="108" cy="55" r="8" fill="#fbbf24"/>
+  <circle cx="136" cy="55" r="8" fill="#4ade80"/>
+
+  <!-- URL Bar -->
+  <rect x="200" y="42" width="400" height="26" rx="6" fill="white" stroke="#e2e8f0"/>
+  <text x="220" y="60" font-family="system-ui" font-size="12" fill="#64748b">youtube.com/watch?v=...</text>
+
+  <!-- YouTube Player Area -->
+  <rect x="80" y="100" width="700" height="394" rx="8" fill="#1e293b"/>
+  <polygon points="380,297 480,347 380,397" fill="white" opacity="0.9"/>
+
+  <!-- Video Title -->
+  <rect x="80" y="510" width="500" height="24" rx="4" fill="#334155"/>
+  <rect x="80" y="545" width="300" height="16" rx="4" fill="#94a3b8"/>
+
+  <!-- Side Panel -->
+  <rect x="810" y="100" width="310" height="500" rx="8" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+
+  <!-- Side Panel Header -->
+  <rect x="810" y="100" width="310" height="50" rx="8" fill="#0ea5e9"/>
+  <text x="840" y="132" font-family="system-ui" font-size="16" font-weight="600" fill="white">Magpie Summary</text>
+
+  <!-- Summary Content -->
+  <rect x="830" y="170" width="270" height="12" rx="2" fill="#334155"/>
+  <rect x="830" y="192" width="250" height="12" rx="2" fill="#64748b"/>
+  <rect x="830" y="214" width="260" height="12" rx="2" fill="#64748b"/>
+
+  <rect x="830" y="250" width="200" height="12" rx="2" fill="#334155"/>
+  <rect x="830" y="272" width="240" height="12" rx="2" fill="#64748b"/>
+  <rect x="830" y="294" width="220" height="12" rx="2" fill="#64748b"/>
+  <rect x="830" y="316" width="250" height="12" rx="2" fill="#64748b"/>
+
+  <rect x="830" y="352" width="180" height="12" rx="2" fill="#334155"/>
+  <rect x="830" y="374" width="260" height="12" rx="2" fill="#64748b"/>
+  <rect x="830" y="396" width="230" height="12" rx="2" fill="#64748b"/>
+
+  <!-- Chat Input -->
+  <rect x="830" y="540" width="220" height="36" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+  <text x="850" y="564" font-family="system-ui" font-size="13" fill="#94a3b8">Ask a question...</text>
+  <rect x="1060" y="544" width="28" height="28" rx="6" fill="#0ea5e9"/>
+</svg>

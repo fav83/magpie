@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+extension/dist/
+landing/dist/
+
+# Environment files (keep .env.example only)
+.env
+.env.local
+.env.*.local
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Experimental
+playground/
+
+# AI agent configuration
+.claude/
+CLAUDE.md
+AGENTS.md
+
+# Internal docs (not for public)
+.internal/

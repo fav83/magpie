@@ -1,0 +1,39 @@
+{
+  "name": "magpie-landing",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:no-prerender && node scripts/generate-sitemap.js",
+    "build:no-prerender": "tsc -b && vite build",
+    "build:prerender": "npm run build:no-prerender && node scripts/build-with-prerender.js && node scripts/generate-sitemap.js",
+    "preview": "vite preview --port 4173",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-helmet-async": "^2.0.5",
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.5.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.36.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.2.0",
+    "postcss": "^8.5.6",
+    "puppeteer": "^24.0.0",
+    "tailwindcss": "^3.4.18",
+    "typescript": "~5.6.0",
+    "typescript-eslint": "^8.32.0",
+    "vite": "^5.4.0"
+  }
+}
