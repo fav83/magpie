@@ -73,7 +73,7 @@ export function Footer({ hideCta = false }: FooterProps) {
 
             {/* Copyright */}
             <p className="text-xs text-cream-600">
-              // no tracking, no data collection
+              // YouTube video summarizer
             </p>
           </div>
         </div>

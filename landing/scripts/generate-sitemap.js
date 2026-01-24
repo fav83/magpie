@@ -1,9 +1,21 @@
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { discoverRoutes } from './route-discovery.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load .env.production file
+const envPath = join(__dirname, '../.env.production');
+try {
+  const envContent = readFileSync(envPath, 'utf-8');
+  envContent.split('\n').forEach(line => {
+    const [key, value] = line.split('=');
+    if (key && value) process.env[key.trim()] = value.trim();
+  });
+} catch (e) {
+  // Ignore if file doesn't exist
+}
 
 // Get site URL from environment or use default
 const siteUrl = process.env.VITE_SITE_URL || 'https://magpie.example.com';

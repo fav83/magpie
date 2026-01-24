@@ -11,7 +11,7 @@ interface LegalPageProps {
 const pageMeta = {
   'privacy-policy': {
     title: 'Privacy Policy',
-    description: 'Privacy Policy for Magpie - YouTube Video Summarizer Chrome Extension',
+    description: 'Learn how Magpie protects your privacy. Our open-source YouTube summarizer Chrome extension processes videos locally with no data collection or tracking.',
   },
 };
 

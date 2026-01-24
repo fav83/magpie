@@ -21,6 +21,8 @@ export function PageHelmet({ title, description, path = '', image }: PageHelmetP
       <link rel="canonical" href={canonicalUrl} />
 
       {/* Open Graph */}
+      <meta property="og:locale" content="en_US" />
+      <meta property="og:site_name" content="Magpie" />
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:url" content={canonicalUrl} />
