@@ -1,0 +1,7 @@
+fastapi==0.115.*
+uvicorn[standard]==0.34.*
+youtube-transcript-api==1.*
+azure-monitor-opentelemetry==1.*
+pydantic-settings==2.*
+pytest==8.*
+httpx==0.28.*
