@@ -6,7 +6,6 @@ vi.mock('../../src/config', () => ({
   config: {
     openrouter: {
       apiUrl: 'https://openrouter.ai/api/v1',
-      apiKey: 'test-key',
       model: 'openai/gpt-4o-mini',
     },
     prompt: 'Summarize: {{transcript}}',
@@ -31,11 +30,11 @@ describe('generateSummary', () => {
       }),
     });
 
-    const result = await generateSummary('transcript text');
+    const result = await generateSummary('transcript text', 'sk-or-test-key');
     expect(result).toEqual({ success: true, data: 'This is a summary' });
   });
 
-  it('sends correct request body', async () => {
+  it('sends correct request body with API key', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -44,12 +43,15 @@ describe('generateSummary', () => {
       }),
     });
 
-    await generateSummary('my transcript');
+    await generateSummary('my transcript', 'sk-or-my-key');
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://openrouter.ai/api/v1/chat/completions',
       expect.objectContaining({
         method: 'POST',
+        headers: expect.objectContaining({
+          'Authorization': 'Bearer sk-or-my-key',
+        }),
         body: JSON.stringify({
           model: 'openai/gpt-4o-mini',
           messages: [{ role: 'user', content: 'Summarize: my transcript' }],
@@ -61,21 +63,21 @@ describe('generateSummary', () => {
   it('returns INVALID_API_KEY on 401', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 401 });
 
-    const result = await generateSummary('transcript');
+    const result = await generateSummary('transcript', 'sk-or-bad');
     expect(result).toEqual({ success: false, error: 'INVALID_API_KEY' });
   });
 
   it('returns RATE_LIMITED on 429', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 429 });
 
-    const result = await generateSummary('transcript');
+    const result = await generateSummary('transcript', 'sk-or-key');
     expect(result).toEqual({ success: false, error: 'RATE_LIMITED' });
   });
 
   it('returns API_ERROR on other HTTP errors', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 500 });
 
-    const result = await generateSummary('transcript');
+    const result = await generateSummary('transcript', 'sk-or-key');
     expect(result).toEqual({ success: false, error: 'API_ERROR' });
   });
 
@@ -86,7 +88,7 @@ describe('generateSummary', () => {
       json: async () => ({ choices: [] }),
     });
 
-    const result = await generateSummary('transcript');
+    const result = await generateSummary('transcript', 'sk-or-key');
     expect(result).toEqual({ success: false, error: 'API_ERROR' });
   });
 
@@ -97,21 +99,21 @@ describe('generateSummary', () => {
       json: async () => ({}),
     });
 
-    const result = await generateSummary('transcript');
+    const result = await generateSummary('transcript', 'sk-or-key');
     expect(result).toEqual({ success: false, error: 'API_ERROR' });
   });
 
   it('returns NETWORK_ERROR on fetch TypeError', async () => {
     mockFetch.mockRejectedValue(new TypeError('fetch failed'));
 
-    const result = await generateSummary('transcript');
+    const result = await generateSummary('transcript', 'sk-or-key');
     expect(result).toEqual({ success: false, error: 'NETWORK_ERROR' });
   });
 
   it('returns API_ERROR on non-fetch errors', async () => {
     mockFetch.mockRejectedValue(new Error('something else'));
 
-    const result = await generateSummary('transcript');
+    const result = await generateSummary('transcript', 'sk-or-key');
     expect(result).toEqual({ success: false, error: 'API_ERROR' });
   });
 });

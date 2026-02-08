@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import { isValidYouTubeUrl, extractVideoId } from './utils/youtube';
 import { fetchTranscript } from './services/transcript';
 import { generateSummary } from './services/openrouter';
+import { loadApiKey } from './services/storage';
+import { Settings } from './components/Settings';
 import { config } from './config';
 
 type AppState = 'idle' | 'fetching-transcript' | 'generating-summary' | 'done' | 'error';
+type Page = 'main' | 'settings';
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_URL: 'Please enter a valid YouTube video URL',
@@ -16,7 +19,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   NETWORK_ERROR: 'No internet connection. Please check your network.',
   INVALID_API_KEY: 'Failed to generate summary. Please try again.',
   RATE_LIMITED: 'Rate limited. Please try again later.',
-  NO_API_KEY: 'API key not configured. The app cannot generate summaries.',
 };
 
 function Spinner({ className }: { className: string }): React.JSX.Element {
@@ -38,10 +40,21 @@ function LoadingIndicator({ state }: { state: AppState }): React.JSX.Element {
   );
 }
 
-function ErrorBanner({ message }: { message: string }): React.JSX.Element {
+function ErrorBanner({ message, onGoToSettings }: { message: string; onGoToSettings?: (() => void) | undefined }): React.JSX.Element {
   return (
     <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-      <p className="text-sm text-red-700">{message}</p>
+      <p className="text-sm text-red-700">
+        {message}
+        {onGoToSettings && (
+          <>
+            {' '}
+            <button onClick={onGoToSettings} className="underline font-medium">
+              Go to Settings
+            </button>
+            {' '}to add your key.
+          </>
+        )}
+      </p>
     </div>
   );
 }
@@ -59,15 +72,27 @@ export function App(): React.JSX.Element {
   const [state, setState] = useState<AppState>('idle');
   const [summary, setSummary] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [currentPage, setCurrentPage] = useState<Page>('main');
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [noKeyError, setNoKeyError] = useState(false);
+
+  useEffect(() => {
+    void loadApiKey().then((key) => {
+      setApiKey(key);
+    });
+  }, []);
 
   const isLoading = state === 'fetching-transcript' || state === 'generating-summary';
 
   const handleSummarize = async () => {
     // Check API key first
-    if (!config.openrouter.apiKey) {
-      setErrorMessage(ERROR_MESSAGES.NO_API_KEY ?? 'Configuration error');
+    if (!apiKey) {
+      setNoKeyError(true);
+      setErrorMessage('API key not configured.');
       return;
     }
+
+    setNoKeyError(false);
 
     // Validate URL
     const trimmedUrl = url.trim();
@@ -104,7 +129,7 @@ export function App(): React.JSX.Element {
     // Phase 2: Generate summary
     setState('generating-summary');
 
-    const summaryResult = await generateSummary(transcriptResult.data.transcript);
+    const summaryResult = await generateSummary(transcriptResult.data.transcript, apiKey);
     if (!summaryResult.success) {
       setState('error');
       setErrorMessage(ERROR_MESSAGES[summaryResult.error] ?? 'Failed to generate summary.');
@@ -115,11 +140,26 @@ export function App(): React.JSX.Element {
     setState('done');
   };
 
+  if (currentPage === 'settings') {
+    return (
+      <Settings
+        onBack={() => setCurrentPage('main')}
+        onKeySaved={(key) => setApiKey(key)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
-      <header className="px-4 py-3 border-b border-gray-200">
+      <header className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-800">Magpie</h1>
+        <button onClick={() => setCurrentPage('settings')} className="text-gray-500" aria-label="Settings">
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
       </header>
 
       {/* Input area */}
@@ -157,7 +197,12 @@ export function App(): React.JSX.Element {
       <div className="flex-1 px-4 py-2 overflow-y-auto">
         {isLoading && <LoadingIndicator state={state} />}
 
-        {errorMessage && !isLoading && <ErrorBanner message={errorMessage} />}
+        {errorMessage && !isLoading && (
+          <ErrorBanner
+            message={errorMessage}
+            onGoToSettings={noKeyError ? () => setCurrentPage('settings') : undefined}
+          />
+        )}
 
         {state === 'done' && summary && <SummaryView summary={summary} />}
       </div>

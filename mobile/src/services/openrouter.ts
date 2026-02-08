@@ -10,7 +10,7 @@ interface OpenRouterResponse {
 
 export type SummaryError = 'INVALID_API_KEY' | 'RATE_LIMITED' | 'API_ERROR' | 'NETWORK_ERROR';
 
-export async function generateSummary(transcript: string): Promise<{ success: true; data: string } | { success: false; error: SummaryError }> {
+export async function generateSummary(transcript: string, apiKey: string): Promise<{ success: true; data: string } | { success: false; error: SummaryError }> {
   try {
     const content = config.prompt.replace('{{transcript}}', transcript);
 
@@ -18,7 +18,7 @@ export async function generateSummary(transcript: string): Promise<{ success: tr
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.openrouter.apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
         'HTTP-Referer': 'https://magpie.app',
         'X-Title': 'Magpie',
       },

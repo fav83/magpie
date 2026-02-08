@@ -1,7 +1,6 @@
 export const config = {
   openrouter: {
     apiUrl: 'https://openrouter.ai/api/v1',
-    apiKey: import.meta.env.VITE_OPENROUTER_API_KEY as string || '',
     model: 'openai/gpt-4o-mini',
   },
   prompt: `Summarize in 3-5 short bullet points:
