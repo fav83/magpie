@@ -1,3 +1,4 @@
+import logging
 import re
 from urllib.parse import parse_qs, urlparse
 
@@ -9,6 +10,8 @@ from youtube_transcript_api import (
     VideoUnavailable,
     YouTubeTranscriptApi,
 )
+
+logger = logging.getLogger(__name__)
 
 ytt_api = YouTubeTranscriptApi()
 
@@ -77,7 +80,8 @@ def fetch_transcript(video_id: str) -> list[dict]:
         )
     except VideoUnavailable:
         raise HTTPException(status_code=404, detail="Video not found")
-    except CouldNotRetrieveTranscript:
+    except CouldNotRetrieveTranscript as e:
+        logger.exception("Failed to retrieve transcript for %s: %s", video_id, e)
         raise HTTPException(status_code=500, detail="Failed to retrieve transcript")
 
     # Fallback: try first available transcript (manual preferred over auto-generated)
