@@ -19,6 +19,21 @@ export function extractVideoId(url: string): string {
 }
 
 /**
+ * Extract the first YouTube URL from arbitrary text.
+ * Unlike extractVideoId (which expects a clean URL), this scans text like
+ * "Check this out: https://youtu.be/abc123 it's great" for embedded URLs.
+ */
+export function extractYouTubeUrl(text: string): string | null {
+  // Match any https/http URL, then validate with isValidYouTubeUrl
+  const urlPattern = /https?:\/\/[^\s]+/g;
+  let match: RegExpExecArray | null;
+  while ((match = urlPattern.exec(text)) !== null) {
+    if (isValidYouTubeUrl(match[0])) return match[0];
+  }
+  return null;
+}
+
+/**
  * Check if a URL is a valid YouTube video URL
  */
 export function isValidYouTubeUrl(url: string): boolean {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractVideoId, isValidYouTubeUrl } from '../../src/utils/youtube';
+import { extractVideoId, isValidYouTubeUrl, extractYouTubeUrl } from '../../src/utils/youtube';
 
 describe('extractVideoId', () => {
   it('extracts ID from standard youtube.com URL', () => {
@@ -78,5 +78,61 @@ describe('isValidYouTubeUrl', () => {
 
   it('rejects plain text', () => {
     expect(isValidYouTubeUrl('not a url')).toBe(false);
+  });
+});
+
+describe('extractYouTubeUrl', () => {
+  it('extracts URL from plain YouTube URL string', () => {
+    expect(extractYouTubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+    );
+  });
+
+  it('extracts URL from title + youtu.be format', () => {
+    expect(extractYouTubeUrl('Video Title\nhttps://youtu.be/abc123')).toBe(
+      'https://youtu.be/abc123'
+    );
+  });
+
+  it('extracts URL from text with surrounding content', () => {
+    expect(
+      extractYouTubeUrl("Check this out https://www.youtube.com/watch?v=abc123 it's great")
+    ).toBe('https://www.youtube.com/watch?v=abc123');
+  });
+
+  it('returns null for text with no YouTube URL', () => {
+    expect(extractYouTubeUrl('Just some random text with no URLs')).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(extractYouTubeUrl('')).toBeNull();
+  });
+
+  it('handles youtu.be short URL', () => {
+    expect(extractYouTubeUrl('https://youtu.be/dQw4w9WgXcQ')).toBe(
+      'https://youtu.be/dQw4w9WgXcQ'
+    );
+  });
+
+  it('handles m.youtube.com URL', () => {
+    expect(extractYouTubeUrl('https://m.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(
+      'https://m.youtube.com/watch?v=dQw4w9WgXcQ'
+    );
+  });
+
+  it('returns first URL when multiple YouTube URLs are present', () => {
+    expect(
+      extractYouTubeUrl('https://youtu.be/first123 and https://youtu.be/second456')
+    ).toBe('https://youtu.be/first123');
+  });
+
+  it('returns null for non-YouTube URL', () => {
+    expect(extractYouTubeUrl('https://example.com/watch?v=abc123')).toBeNull();
+  });
+
+  it('handles http:// URLs', () => {
+    expect(extractYouTubeUrl('http://www.youtube.com/watch?v=abc123')).toBe(
+      'http://www.youtube.com/watch?v=abc123'
+    );
   });
 });

@@ -1,12 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   formatCookies,
   extractApiKey,
   selectTrack,
   decodeEntities,
   parseTranscriptXml,
+  fetchTranscript,
   type CaptionTrack,
 } from '../../src/services/transcript';
+
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
+
+beforeEach(() => {
+  mockFetch.mockReset();
+});
 
 describe('formatCookies', () => {
   it('formats a single cookie', () => {
@@ -136,5 +144,177 @@ describe('parseTranscriptXml', () => {
   it('pads seconds to two digits', () => {
     const xml = '<text start="5" dur="1.0">Five seconds</text>';
     expect(parseTranscriptXml(xml)).toEqual(['[0:05] Five seconds']);
+  });
+});
+
+// Helpers for fetchTranscript integration tests
+const WATCH_PAGE_HTML = `
+<html><head>"INNERTUBE_API_KEY": "AIzaSyTestKey123"</head><body></body></html>
+`;
+
+const INNERTUBE_RESPONSE = {
+  videoDetails: { title: 'Test Video' },
+  captions: {
+    playerCaptionsTracklistRenderer: {
+      captionTracks: [
+        { baseUrl: 'https://www.youtube.com/api/timedtext?v=test123&lang=en', languageCode: 'en' },
+      ],
+    },
+  },
+};
+
+const CAPTION_XML = '<text start="0" dur="3.0">Hello world</text><text start="5" dur="2.0">Second line</text>';
+
+function mockHeaders(cookies: string[] = []): { get: () => null; getSetCookie: () => string[] } {
+  return {
+    get: () => null,
+    getSetCookie: () => cookies,
+  };
+}
+
+function setupHappyPath(): void {
+  mockFetch.mockImplementation(async (url: string) => {
+    if (typeof url === 'string' && url.startsWith('https://www.youtube.com/watch')) {
+      return { ok: true, text: async () => WATCH_PAGE_HTML, headers: mockHeaders() };
+    }
+    if (typeof url === 'string' && url.startsWith('https://www.youtube.com/youtubei/v1/player')) {
+      return { ok: true, json: async () => INNERTUBE_RESPONSE, headers: mockHeaders() };
+    }
+    if (typeof url === 'string' && url.startsWith('https://www.youtube.com/api/timedtext')) {
+      return { ok: true, text: async () => CAPTION_XML, headers: mockHeaders() };
+    }
+    throw new Error(`Unexpected fetch URL: ${url}`);
+  });
+}
+
+describe('fetchTranscript', () => {
+  it('returns transcript on successful flow', async () => {
+    setupHappyPath();
+
+    const result = await fetchTranscript('test123');
+
+    expect(result).toEqual({
+      success: true,
+      data: {
+        transcript: '[0:00] Hello world\n[0:05] Second line',
+        title: 'Test Video',
+      },
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns EXTRACTION_FAILED when no API key in page HTML', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => '<html>no key here</html>',
+      headers: mockHeaders(),
+    });
+
+    const result = await fetchTranscript('test123');
+    expect(result).toEqual({ success: false, error: 'EXTRACTION_FAILED' });
+  });
+
+  it('returns EXTRACTION_FAILED when InnerTube returns non-OK', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, text: async () => WATCH_PAGE_HTML, headers: mockHeaders() })
+      .mockResolvedValueOnce({ ok: false, status: 500 });
+
+    const result = await fetchTranscript('test123');
+    expect(result).toEqual({ success: false, error: 'EXTRACTION_FAILED' });
+  });
+
+  it('returns EXTRACTION_FAILED when playability status is ERROR', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, text: async () => WATCH_PAGE_HTML, headers: mockHeaders() })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          videoDetails: { title: 'Test' },
+          playabilityStatus: { status: 'ERROR' },
+          captions: { playerCaptionsTracklistRenderer: { captionTracks: [{ baseUrl: 'http://x', languageCode: 'en' }] } },
+        }),
+        headers: mockHeaders(),
+      });
+
+    const result = await fetchTranscript('test123');
+    expect(result).toEqual({ success: false, error: 'EXTRACTION_FAILED' });
+  });
+
+  it('returns NO_CAPTIONS when no caption tracks exist', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, text: async () => WATCH_PAGE_HTML, headers: mockHeaders() })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ videoDetails: { title: 'Test' }, captions: { playerCaptionsTracklistRenderer: { captionTracks: [] } } }),
+        headers: mockHeaders(),
+      });
+
+    const result = await fetchTranscript('test123');
+    expect(result).toEqual({ success: false, error: 'NO_CAPTIONS' });
+  });
+
+  it('returns NO_CAPTIONS when caption XML is empty', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, text: async () => WATCH_PAGE_HTML, headers: mockHeaders() })
+      .mockResolvedValueOnce({ ok: true, json: async () => INNERTUBE_RESPONSE, headers: mockHeaders() })
+      .mockResolvedValueOnce({ ok: true, text: async () => '', headers: mockHeaders() });
+
+    const result = await fetchTranscript('test123');
+    expect(result).toEqual({ success: false, error: 'NO_CAPTIONS' });
+  });
+
+  it('returns EXTRACTION_FAILED when caption fetch returns non-OK', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, text: async () => WATCH_PAGE_HTML, headers: mockHeaders() })
+      .mockResolvedValueOnce({ ok: true, json: async () => INNERTUBE_RESPONSE, headers: mockHeaders() })
+      .mockResolvedValueOnce({ ok: false, status: 404 });
+
+    const result = await fetchTranscript('test123');
+    expect(result).toEqual({ success: false, error: 'EXTRACTION_FAILED' });
+  });
+
+  it('returns NETWORK_ERROR on fetch TypeError', async () => {
+    mockFetch.mockRejectedValue(new TypeError('fetch failed'));
+
+    const result = await fetchTranscript('test123');
+    expect(result).toEqual({ success: false, error: 'NETWORK_ERROR' });
+  });
+
+  it('returns EXTRACTION_FAILED on non-fetch errors', async () => {
+    mockFetch.mockRejectedValue(new Error('something else'));
+
+    const result = await fetchTranscript('test123');
+    expect(result).toEqual({ success: false, error: 'EXTRACTION_FAILED' });
+  });
+
+  it('passes signal to all fetch calls', async () => {
+    setupHappyPath();
+    const controller = new AbortController();
+
+    await fetchTranscript('test123', controller.signal);
+
+    for (const call of mockFetch.mock.calls) {
+      const opts = call[1] as RequestInit;
+      expect(opts.signal).toBe(controller.signal);
+    }
+  });
+
+  it('defaults title to Unknown when videoDetails missing', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, text: async () => WATCH_PAGE_HTML, headers: mockHeaders() })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          captions: { playerCaptionsTracklistRenderer: { captionTracks: [{ baseUrl: 'https://www.youtube.com/api/timedtext?lang=en', languageCode: 'en' }] } },
+        }),
+        headers: mockHeaders(),
+      })
+      .mockResolvedValueOnce({ ok: true, text: async () => CAPTION_XML, headers: mockHeaders() });
+
+    const result = await fetchTranscript('test123');
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.title).toBe('Unknown');
+    }
   });
 });

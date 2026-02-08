@@ -138,4 +138,35 @@ describe('generateSummary', () => {
     const result = await generateSummary('transcript', 'sk-or-key', promptText, model);
     expect(result).toEqual({ success: false, error: 'API_ERROR' });
   });
+
+  it('passes AbortSignal to fetch', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'summary' } }],
+      }),
+    });
+
+    const controller = new AbortController();
+    await generateSummary('transcript', 'sk-or-key', promptText, model, controller.signal);
+
+    const call = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(call[1].signal).toBe(controller.signal);
+  });
+
+  it('passes null signal when no AbortSignal provided', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'summary' } }],
+      }),
+    });
+
+    await generateSummary('transcript', 'sk-or-key', promptText, model);
+
+    const call = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(call[1].signal).toBeNull();
+  });
 });

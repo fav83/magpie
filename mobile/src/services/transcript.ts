@@ -1,3 +1,5 @@
+import type { Result } from '../types/result';
+
 export interface TranscriptResult {
   transcript: string;
   title: string;
@@ -34,12 +36,13 @@ interface InnerTubeResponse {
  * Fetches the YouTube watch page HTML, handling the GDPR consent flow.
  * Returns the page HTML and any cookies set during the flow.
  */
-async function fetchVideoPage(videoId: string): Promise<{ html: string; cookies: Record<string, string> }> {
+async function fetchVideoPage(videoId: string, signal?: AbortSignal): Promise<{ html: string; cookies: Record<string, string> }> {
   const cookies: Record<string, string> = {};
 
   const doFetch = async (): Promise<string> => {
     const cookieStr = formatCookies(cookies);
     const resp = await fetch(WATCH_URL + videoId, {
+      signal: signal ?? null,
       headers: {
         'Accept-Language': 'en-US',
         ...(cookieStr ? { 'Cookie': cookieStr } : {}),
@@ -85,10 +88,11 @@ export function extractApiKey(html: string): string | null {
  * Calls the InnerTube player API with ANDROID client context to get
  * caption track URLs that work without PoToken authentication.
  */
-async function fetchInnerTubeData(videoId: string, apiKey: string, cookies: Record<string, string>): Promise<InnerTubeResponse> {
+async function fetchInnerTubeData(videoId: string, apiKey: string, cookies: Record<string, string>, signal?: AbortSignal): Promise<InnerTubeResponse> {
   const cookieStr = formatCookies(cookies);
   const resp = await fetch(INNERTUBE_API_URL + apiKey, {
     method: 'POST',
+    signal: signal ?? null,
     headers: {
       'Content-Type': 'application/json',
       'Accept-Language': 'en-US',
@@ -167,10 +171,10 @@ export function parseTranscriptXml(xml: string): string[] {
  * 3. ANDROID client returns caption URLs without PoToken requirements
  * 4. Fetch caption XML and parse into timestamped lines
  */
-export async function fetchTranscript(videoId: string): Promise<{ success: true; data: TranscriptResult } | { success: false; error: TranscriptError }> {
+export async function fetchTranscript(videoId: string, signal?: AbortSignal): Promise<Result<TranscriptResult, TranscriptError>> {
   try {
     // Step 1: Fetch page HTML (handles consent)
-    const { html, cookies } = await fetchVideoPage(videoId);
+    const { html, cookies } = await fetchVideoPage(videoId, signal);
 
     // Step 2: Extract API key
     const apiKey = extractApiKey(html);
@@ -179,7 +183,7 @@ export async function fetchTranscript(videoId: string): Promise<{ success: true;
     }
 
     // Step 3: Call InnerTube API with ANDROID client
-    const data = await fetchInnerTubeData(videoId, apiKey, cookies);
+    const data = await fetchInnerTubeData(videoId, apiKey, cookies, signal);
 
     const title = data.videoDetails?.title ?? 'Unknown';
 
@@ -206,6 +210,7 @@ export async function fetchTranscript(videoId: string): Promise<{ success: true;
     // Step 6: Fetch caption XML
     const cookieStr = formatCookies(cookies);
     const captionResp = await fetch(captionUrl, {
+      signal: signal ?? null,
       headers: {
         'Accept-Language': 'en-US',
         ...(cookieStr ? { 'Cookie': cookieStr } : {}),

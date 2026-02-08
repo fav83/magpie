@@ -1,3 +1,4 @@
+import type { Result } from '../types/result';
 import { config, openRouterHeaders } from '../config';
 
 interface OpenRouterResponse {
@@ -14,13 +15,15 @@ export async function generateSummary(
   transcript: string,
   apiKey: string,
   promptText: string,
-  model: string
-): Promise<{ success: true; data: string } | { success: false; error: SummaryError }> {
+  model: string,
+  signal?: AbortSignal
+): Promise<Result<string, SummaryError>> {
   try {
     const content = promptText.replace('{{transcript}}', transcript);
 
     const response = await fetch(`${config.openrouter.apiUrl}/chat/completions`, {
       method: 'POST',
+      signal: signal ?? null,
       headers: {
         'Content-Type': 'application/json',
         ...openRouterHeaders(apiKey),

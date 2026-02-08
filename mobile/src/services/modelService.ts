@@ -6,9 +6,10 @@ export interface ModelInfo {
 }
 
 let cachedModels: ModelInfo[] | null = null;
+let cachedForKey: string | null = null;
 
 export async function fetchModels(apiKey: string): Promise<ModelInfo[]> {
-  if (cachedModels) {
+  if (cachedModels && cachedForKey === apiKey) {
     return cachedModels;
   }
 
@@ -27,9 +28,11 @@ export async function fetchModels(apiKey: string): Promise<ModelInfo[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   cachedModels = models;
+  cachedForKey = apiKey;
   return models;
 }
 
 export function clearModelCache(): void {
   cachedModels = null;
+  cachedForKey = null;
 }

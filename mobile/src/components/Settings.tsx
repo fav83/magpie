@@ -1,9 +1,49 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useReducer } from 'react';
 import { validateApiKeyFormat, validateApiKeyServer } from '../services/apiKeyValidation';
 import { saveApiKey, loadApiKey } from '../services/storage';
 import { Spinner, BackButton } from './ui';
 
-type SettingsState = 'idle' | 'editing' | 'testing' | 'test-passed' | 'test-failed' | 'saving' | 'saved';
+type Phase = 'idle' | 'editing' | 'testing' | 'test-passed' | 'test-failed' | 'saving' | 'saved';
+
+interface SettingsFormState {
+  phase: Phase;
+  statusMessage: string;
+  statusType: 'success' | 'error' | 'info';
+}
+
+type SettingsAction =
+  | { type: 'START_EDITING' }
+  | { type: 'INPUT_CHANGED' }
+  | { type: 'START_TEST' }
+  | { type: 'TEST_PASSED' }
+  | { type: 'TEST_FAILED'; message: string }
+  | { type: 'START_SAVE' }
+  | { type: 'SAVE_COMPLETE' }
+  | { type: 'RESET' };
+
+function settingsReducer(state: SettingsFormState, action: SettingsAction): SettingsFormState {
+  switch (action.type) {
+    case 'START_EDITING':
+      return { phase: 'editing', statusMessage: '', statusType: 'info' };
+    case 'INPUT_CHANGED':
+      if (state.phase === 'test-passed' || state.phase === 'test-failed' || state.phase === 'saved') {
+        return { phase: 'editing', statusMessage: '', statusType: 'info' };
+      }
+      return state;
+    case 'START_TEST':
+      return { phase: 'testing', statusMessage: 'Testing...', statusType: 'info' };
+    case 'TEST_PASSED':
+      return { phase: 'test-passed', statusMessage: 'API key is valid', statusType: 'success' };
+    case 'TEST_FAILED':
+      return { phase: 'test-failed', statusMessage: action.message, statusType: 'error' };
+    case 'START_SAVE':
+      return { phase: 'saving', statusMessage: 'Saving...', statusType: 'info' };
+    case 'SAVE_COMPLETE':
+      return { phase: 'saved', statusMessage: 'Saved', statusType: 'success' };
+    case 'RESET':
+      return { phase: 'idle', statusMessage: '', statusType: 'info' };
+  }
+}
 
 function maskKey(key: string): string {
   if (key.length <= 9) return key;
@@ -19,9 +59,7 @@ interface SettingsProps {
 export function Settings({ onBack, onKeySaved, onManagePrompts }: SettingsProps): React.JSX.Element {
   const [inputValue, setInputValue] = useState('');
   const [savedKey, setSavedKey] = useState<string | null>(null);
-  const [settingsState, setSettingsState] = useState<SettingsState>('idle');
-  const [statusMessage, setStatusMessage] = useState('');
-  const [statusType, setStatusType] = useState<'success' | 'error' | 'info'>('info');
+  const [form, dispatch] = useReducer(settingsReducer, { phase: 'idle', statusMessage: '', statusType: 'info' });
   const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
@@ -33,76 +71,51 @@ export function Settings({ onBack, onKeySaved, onManagePrompts }: SettingsProps)
     });
   }, []);
 
-  const displayValue = isFocused || settingsState === 'editing' || settingsState === 'testing' || settingsState === 'test-passed' || settingsState === 'test-failed'
-    ? inputValue
-    : savedKey ? maskKey(savedKey) : '';
-
-  const testDisabled = inputValue.trim() === '' || settingsState === 'testing' || settingsState === 'saving';
-  const saveDisabled = settingsState !== 'test-passed';
+  const isEditing = isFocused || form.phase === 'editing' || form.phase === 'testing' || form.phase === 'test-passed' || form.phase === 'test-failed';
+  const displayValue = isEditing ? inputValue : savedKey ? maskKey(savedKey) : '';
+  const testDisabled = inputValue.trim() === '' || form.phase === 'testing' || form.phase === 'saving';
+  const saveDisabled = form.phase !== 'test-passed';
 
   const handleFocus = () => {
     setIsFocused(true);
-    if (settingsState === 'idle' || settingsState === 'saved') {
-      setSettingsState('editing');
+    if (form.phase === 'idle' || form.phase === 'saved') {
+      dispatch({ type: 'START_EDITING' });
     }
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
   };
 
   const handleChange = (value: string) => {
     setInputValue(value);
-    if (settingsState === 'test-passed' || settingsState === 'test-failed' || settingsState === 'saved') {
-      setSettingsState('editing');
-      setStatusMessage('');
-    }
+    dispatch({ type: 'INPUT_CHANGED' });
   };
 
   const handleTest = async () => {
     const key = inputValue.trim();
     const formatError = validateApiKeyFormat(key);
     if (formatError) {
-      setSettingsState('test-failed');
-      setStatusType('error');
-      setStatusMessage(formatError);
+      dispatch({ type: 'TEST_FAILED', message: formatError });
       return;
     }
 
-    setSettingsState('testing');
-    setStatusType('info');
-    setStatusMessage('Testing...');
+    dispatch({ type: 'START_TEST' });
 
     const result = await validateApiKeyServer(key);
     if (result.valid) {
-      setSettingsState('test-passed');
-      setStatusType('success');
-      setStatusMessage('API key is valid');
+      dispatch({ type: 'TEST_PASSED' });
     } else {
-      setSettingsState('test-failed');
-      setStatusType('error');
-      setStatusMessage(result.error);
+      dispatch({ type: 'TEST_FAILED', message: result.error });
     }
   };
 
   const handleSave = async () => {
     const key = inputValue.trim();
-    setSettingsState('saving');
-    setStatusType('info');
-    setStatusMessage('Saving...');
+    dispatch({ type: 'START_SAVE' });
 
     await saveApiKey(key);
     setSavedKey(key);
     onKeySaved(key);
 
-    setSettingsState('saved');
-    setStatusType('success');
-    setStatusMessage('Saved');
-
-    setTimeout(() => {
-      setStatusMessage('');
-      setSettingsState('idle');
-    }, 2000);
+    dispatch({ type: 'SAVE_COMPLETE' });
+    setTimeout(() => dispatch({ type: 'RESET' }), 2000);
   };
 
   return (
@@ -124,10 +137,10 @@ export function Settings({ onBack, onKeySaved, onManagePrompts }: SettingsProps)
             value={displayValue}
             onChange={(e) => handleChange(e.target.value)}
             onFocus={handleFocus}
-            onBlur={handleBlur}
+            onBlur={() => setIsFocused(false)}
             placeholder="sk-or-..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            disabled={settingsState === 'testing' || settingsState === 'saving'}
+            disabled={form.phase === 'testing' || form.phase === 'saving'}
           />
         </div>
 
@@ -143,7 +156,7 @@ export function Settings({ onBack, onKeySaved, onManagePrompts }: SettingsProps)
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            {settingsState === 'testing' ? (
+            {form.phase === 'testing' ? (
               <span className="flex items-center justify-center gap-2">
                 <Spinner className="h-4 w-4" />
                 Testing
@@ -162,7 +175,7 @@ export function Settings({ onBack, onKeySaved, onManagePrompts }: SettingsProps)
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
           >
-            {settingsState === 'saving' ? (
+            {form.phase === 'saving' ? (
               <span className="flex items-center justify-center gap-2">
                 <Spinner className="h-4 w-4" />
                 Saving
@@ -174,26 +187,26 @@ export function Settings({ onBack, onKeySaved, onManagePrompts }: SettingsProps)
         </div>
 
         {/* Status Area */}
-        {statusMessage && (
+        {form.statusMessage && (
           <div className={`flex items-center gap-2 text-sm ${
-            statusType === 'success' ? 'text-green-600' :
-            statusType === 'error' ? 'text-red-600' :
+            form.statusType === 'success' ? 'text-green-600' :
+            form.statusType === 'error' ? 'text-red-600' :
             'text-gray-500'
           }`}>
-            {statusType === 'success' && (
+            {form.statusType === 'success' && (
               <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             )}
-            {statusType === 'error' && (
+            {form.statusType === 'error' && (
               <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             )}
-            {statusType === 'info' && settingsState === 'testing' && (
+            {form.statusType === 'info' && form.phase === 'testing' && (
               <Spinner className="h-4 w-4 flex-shrink-0" />
             )}
-            <span>{statusMessage}</span>
+            <span>{form.statusMessage}</span>
           </div>
         )}
 

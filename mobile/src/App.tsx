@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Markdown from 'react-markdown';
+import { App as CapApp } from '@capacitor/app';
 import { isValidYouTubeUrl, extractVideoId } from './utils/youtube';
 import { fetchTranscript } from './services/transcript';
 import { generateSummary } from './services/openrouter';
 import { loadApiKey } from './services/storage';
 import { getPrompts, getDefaultPromptId, getPromptById } from './services/promptStorage';
+import { checkShareIntent } from './services/shareIntent';
 import type { Prompt } from './types/prompt';
 import { Settings } from './components/Settings';
 import { ManagePrompts } from './components/ManagePrompts';
@@ -62,6 +64,12 @@ function SummaryView({ summary }: { summary: string }): React.JSX.Element {
   );
 }
 
+function validateUrl(url: string): string | null {
+  const trimmed = url.trim();
+  if (!isValidYouTubeUrl(trimmed)) return null;
+  return extractVideoId(trimmed) || null;
+}
+
 export function App(): React.JSX.Element {
   const [url, setUrl] = useState('');
   const [state, setState] = useState<AppState>('idle');
@@ -74,6 +82,9 @@ export function App(): React.JSX.Element {
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
   const selectedPromptIdRef = useRef(selectedPromptId);
   selectedPromptIdRef.current = selectedPromptId;
+  const handleSummarizeRef = useRef<(urlOverride?: string) => Promise<void>>(() => Promise.resolve());
+  const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const loadPromptData = useCallback(async () => {
     const loaded = await getPrompts();
@@ -85,33 +96,64 @@ export function App(): React.JSX.Element {
     }
   }, []);
 
+  const resetMainScreen = useCallback(() => {
+    setCurrentPage('main');
+    setState('idle');
+    setSummary('');
+    setErrorMessage('');
+  }, []);
+
+  // Load data + check share intent on mount; listen for resume
   useEffect(() => {
     void loadApiKey().then((key) => {
       setApiKey(key);
     });
     void loadPromptData();
-  }, [loadPromptData]);
+
+    const processIntent = async (retryOnNone = true) => {
+      const result = await checkShareIntent();
+      if (result.kind === 'youtube') {
+        resetMainScreen();
+        setUrl(result.url);
+        setPendingShareUrl(result.url);
+      } else if (result.kind === 'no-youtube') {
+        resetMainScreen();
+        setErrorMessage('No YouTube URL found in shared content');
+        setUrl('');
+      } else if (retryOnNone) {
+        // Bridge may not be ready on cold start; retry once
+        setTimeout(() => void processIntent(false), 500);
+      }
+    };
+
+    void processIntent();
+
+    const listener = CapApp.addListener('resume', () => {
+      void processIntent(false);
+    });
+    return () => { void listener.then((l) => l.remove()); };
+  }, [loadPromptData, resetMainScreen]);
+
+  // Auto-summarize when a share URL is pending and app data is ready
+  useEffect(() => {
+    if (pendingShareUrl && apiKey && prompts.length > 0) {
+      const urlToSummarize = pendingShareUrl;
+      setPendingShareUrl(null);
+      void handleSummarizeRef.current(urlToSummarize);
+    }
+  }, [pendingShareUrl, apiKey, prompts]);
 
   const isLoading = state === 'fetching-transcript' || state === 'generating-summary';
 
-  const handleSummarize = async () => {
-    // Check API key first
+  const handleSummarize = async (urlOverride?: string) => {
     if (!apiKey) {
       setNoKeyError(true);
       setErrorMessage('API key not configured.');
       return;
     }
-
     setNoKeyError(false);
 
-    // Validate URL
-    const trimmedUrl = url.trim();
-    if (!isValidYouTubeUrl(trimmedUrl)) {
-      setErrorMessage(ERROR_MESSAGES.INVALID_URL ?? 'Invalid URL');
-      return;
-    }
-
-    const videoId = extractVideoId(trimmedUrl);
+    const videoId = validateUrl((urlOverride ?? url).trim());
     if (!videoId) {
       setErrorMessage(ERROR_MESSAGES.INVALID_URL ?? 'Invalid URL');
       return;
@@ -122,19 +164,24 @@ export function App(): React.JSX.Element {
     const promptText = prompt?.text ?? '{{transcript}}';
     const model = prompt?.model ?? config.defaultModel;
 
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     // Phase 1: Fetch transcript
     setSummary('');
     setErrorMessage('');
     setState('fetching-transcript');
 
-    const transcriptResult = await fetchTranscript(videoId);
+    const transcriptResult = await fetchTranscript(videoId, controller.signal);
     if (!transcriptResult.success) {
+      if (controller.signal.aborted) return;
       setState('error');
       setErrorMessage(ERROR_MESSAGES[transcriptResult.error] ?? 'Failed to extract transcript.');
       return;
     }
 
-    // Check context length
     if (transcriptResult.data.transcript.length > config.maxTranscriptChars) {
       setState('error');
       setErrorMessage(ERROR_MESSAGES.CONTEXT_TOO_LONG ?? 'Transcript too long');
@@ -148,9 +195,11 @@ export function App(): React.JSX.Element {
       transcriptResult.data.transcript,
       apiKey,
       promptText,
-      model
+      model,
+      controller.signal
     );
     if (!summaryResult.success) {
+      if (controller.signal.aborted) return;
       setState('error');
       setErrorMessage(ERROR_MESSAGES[summaryResult.error] ?? 'Failed to generate summary.');
       return;
@@ -159,6 +208,7 @@ export function App(): React.JSX.Element {
     setSummary(summaryResult.data);
     setState('done');
   };
+  handleSummarizeRef.current = handleSummarize;
 
   if (currentPage === 'manage-prompts') {
     return (

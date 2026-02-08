@@ -46,4 +46,20 @@ describe('loadApiKey', () => {
 
     expect(result).toBeNull();
   });
+
+  it('returns null when Preferences.get throws', async () => {
+    mockGet.mockRejectedValue(new Error('Storage unavailable'));
+
+    const result = await loadApiKey();
+
+    expect(result).toBeNull();
+  });
+});
+
+describe('saveApiKey - error handling', () => {
+  it('does not throw when Preferences.set throws', async () => {
+    mockSet.mockRejectedValue(new Error('Storage full'));
+
+    await expect(saveApiKey('sk-or-test-key')).resolves.toBeUndefined();
+  });
 });

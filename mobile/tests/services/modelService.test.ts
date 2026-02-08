@@ -108,6 +108,21 @@ describe('fetchModels', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
+  it('refetches when API key changes', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [{ id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' }],
+      }),
+    });
+
+    await fetchModels('sk-or-key-1');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    await fetchModels('sk-or-key-2');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
   it('returns models sorted alphabetically by name', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
