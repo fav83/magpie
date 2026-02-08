@@ -1,15 +1,15 @@
 export const config = {
   openrouter: {
     apiUrl: 'https://openrouter.ai/api/v1',
-    model: 'openai/gpt-4o-mini',
   },
-  prompt: `Summarize in 3-5 short bullet points:
-• What's the main topic?
-• What are the key points?
-• What's the takeaway?
-
-One sentence per bullet. No preamble or introduction - start directly with the bullets.
-
-{{transcript}}`,
+  defaultModel: 'openai/gpt-4o-mini',
   maxTranscriptChars: 504000, // ~128K tokens minus ~2K reserve, at ~4 chars/token
 } as const;
+
+export function openRouterHeaders(apiKey: string): Record<string, string> {
+  return {
+    'Authorization': `Bearer ${apiKey}`,
+    'HTTP-Referer': 'https://magpie.app',
+    'X-Title': 'Magpie',
+  };
+}

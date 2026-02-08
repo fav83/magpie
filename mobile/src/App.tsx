@@ -1,14 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Markdown from 'react-markdown';
 import { isValidYouTubeUrl, extractVideoId } from './utils/youtube';
 import { fetchTranscript } from './services/transcript';
 import { generateSummary } from './services/openrouter';
 import { loadApiKey } from './services/storage';
+import { getPrompts, getDefaultPromptId, getPromptById } from './services/promptStorage';
+import type { Prompt } from './types/prompt';
 import { Settings } from './components/Settings';
+import { ManagePrompts } from './components/ManagePrompts';
+import { Spinner } from './components/ui';
 import { config } from './config';
 
 type AppState = 'idle' | 'fetching-transcript' | 'generating-summary' | 'done' | 'error';
-type Page = 'main' | 'settings';
+type Page = 'main' | 'settings' | 'manage-prompts';
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_URL: 'Please enter a valid YouTube video URL',
@@ -20,15 +24,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_API_KEY: 'Failed to generate summary. Please try again.',
   RATE_LIMITED: 'Rate limited. Please try again later.',
 };
-
-function Spinner({ className }: { className: string }): React.JSX.Element {
-  return (
-    <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
-  );
-}
 
 function LoadingIndicator({ state }: { state: AppState }): React.JSX.Element {
   const message = state === 'fetching-transcript' ? 'Fetching transcript...' : 'Generating summary...';
@@ -75,12 +70,27 @@ export function App(): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState<Page>('main');
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [noKeyError, setNoKeyError] = useState(false);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
+  const selectedPromptIdRef = useRef(selectedPromptId);
+  selectedPromptIdRef.current = selectedPromptId;
+
+  const loadPromptData = useCallback(async () => {
+    const loaded = await getPrompts();
+    setPrompts(loaded);
+    const currentId = selectedPromptIdRef.current;
+    if (!currentId || !loaded.some((p) => p.id === currentId)) {
+      const defaultId = await getDefaultPromptId();
+      setSelectedPromptId(defaultId);
+    }
+  }, []);
 
   useEffect(() => {
     void loadApiKey().then((key) => {
       setApiKey(key);
     });
-  }, []);
+    void loadPromptData();
+  }, [loadPromptData]);
 
   const isLoading = state === 'fetching-transcript' || state === 'generating-summary';
 
@@ -107,6 +117,11 @@ export function App(): React.JSX.Element {
       return;
     }
 
+    // Get the selected prompt
+    const prompt = selectedPromptId ? await getPromptById(selectedPromptId) : null;
+    const promptText = prompt?.text ?? '{{transcript}}';
+    const model = prompt?.model ?? config.defaultModel;
+
     // Phase 1: Fetch transcript
     setSummary('');
     setErrorMessage('');
@@ -129,7 +144,12 @@ export function App(): React.JSX.Element {
     // Phase 2: Generate summary
     setState('generating-summary');
 
-    const summaryResult = await generateSummary(transcriptResult.data.transcript, apiKey);
+    const summaryResult = await generateSummary(
+      transcriptResult.data.transcript,
+      apiKey,
+      promptText,
+      model
+    );
     if (!summaryResult.success) {
       setState('error');
       setErrorMessage(ERROR_MESSAGES[summaryResult.error] ?? 'Failed to generate summary.');
@@ -140,11 +160,24 @@ export function App(): React.JSX.Element {
     setState('done');
   };
 
+  if (currentPage === 'manage-prompts') {
+    return (
+      <ManagePrompts
+        onBack={() => {
+          setCurrentPage('settings');
+          void loadPromptData();
+        }}
+        apiKey={apiKey}
+      />
+    );
+  }
+
   if (currentPage === 'settings') {
     return (
       <Settings
         onBack={() => setCurrentPage('main')}
         onKeySaved={(key) => setApiKey(key)}
+        onManagePrompts={() => setCurrentPage('manage-prompts')}
       />
     );
   }
@@ -172,6 +205,21 @@ export function App(): React.JSX.Element {
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           disabled={isLoading}
         />
+
+        {/* Prompt Selector */}
+        <select
+          value={selectedPromptId ?? ''}
+          onChange={(e) => setSelectedPromptId(e.target.value)}
+          disabled={isLoading}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+        >
+          {prompts.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}{p.isDefault ? ' (Default)' : ''}
+            </option>
+          ))}
+        </select>
+
         <button
           type="button"
           onClick={() => void handleSummarize()}

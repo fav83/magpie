@@ -1,4 +1,4 @@
-import { config } from '../config';
+import { config, openRouterHeaders } from '../config';
 
 export function validateApiKeyFormat(key: string): string | null {
   if (!key.startsWith('sk-or-')) {
@@ -12,11 +12,7 @@ export async function validateApiKeyServer(
 ): Promise<{ valid: true } | { valid: false; error: string }> {
   try {
     const response = await fetch(`${config.openrouter.apiUrl}/auth/key`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://magpie.app',
-        'X-Title': 'Magpie',
-      },
+      headers: openRouterHeaders(apiKey),
     });
 
     if (response.ok) {

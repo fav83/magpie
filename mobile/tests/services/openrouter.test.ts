@@ -1,16 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateSummary } from '../../src/services/openrouter';
 
-// Mock config to avoid import.meta.env issues in tests
 vi.mock('../../src/config', () => ({
   config: {
     openrouter: {
       apiUrl: 'https://openrouter.ai/api/v1',
-      model: 'openai/gpt-4o-mini',
     },
-    prompt: 'Summarize: {{transcript}}',
+    defaultModel: 'openai/gpt-4o-mini',
     maxTranscriptChars: 504000,
   },
+  openRouterHeaders: (apiKey: string) => ({
+    'Authorization': `Bearer ${apiKey}`,
+    'HTTP-Referer': 'https://magpie.app',
+    'X-Title': 'Magpie',
+  }),
 }));
 
 const mockFetch = vi.fn();
@@ -21,6 +24,9 @@ beforeEach(() => {
 });
 
 describe('generateSummary', () => {
+  const promptText = 'Summarize: {{transcript}}';
+  const model = 'openai/gpt-4o-mini';
+
   it('returns summary on successful response', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
@@ -30,11 +36,11 @@ describe('generateSummary', () => {
       }),
     });
 
-    const result = await generateSummary('transcript text', 'sk-or-test-key');
+    const result = await generateSummary('transcript text', 'sk-or-test-key', promptText, model);
     expect(result).toEqual({ success: true, data: 'This is a summary' });
   });
 
-  it('sends correct request body with API key', async () => {
+  it('sends correct request body with prompt text and model', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -43,7 +49,7 @@ describe('generateSummary', () => {
       }),
     });
 
-    await generateSummary('my transcript', 'sk-or-my-key');
+    await generateSummary('my transcript', 'sk-or-my-key', promptText, 'anthropic/claude-3.5-haiku');
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://openrouter.ai/api/v1/chat/completions',
@@ -53,31 +59,47 @@ describe('generateSummary', () => {
           'Authorization': 'Bearer sk-or-my-key',
         }),
         body: JSON.stringify({
-          model: 'openai/gpt-4o-mini',
+          model: 'anthropic/claude-3.5-haiku',
           messages: [{ role: 'user', content: 'Summarize: my transcript' }],
         }),
       }),
     );
   });
 
+  it('replaces {{transcript}} in the passed prompt text', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'summary' } }],
+      }),
+    });
+
+    await generateSummary('hello world', 'sk-or-key', 'Custom prompt: {{transcript}}', model);
+
+    const call = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(call[1].body as string) as { messages: Array<{ content: string }> };
+    expect(body.messages[0]?.content).toBe('Custom prompt: hello world');
+  });
+
   it('returns INVALID_API_KEY on 401', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 401 });
 
-    const result = await generateSummary('transcript', 'sk-or-bad');
+    const result = await generateSummary('transcript', 'sk-or-bad', promptText, model);
     expect(result).toEqual({ success: false, error: 'INVALID_API_KEY' });
   });
 
   it('returns RATE_LIMITED on 429', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 429 });
 
-    const result = await generateSummary('transcript', 'sk-or-key');
+    const result = await generateSummary('transcript', 'sk-or-key', promptText, model);
     expect(result).toEqual({ success: false, error: 'RATE_LIMITED' });
   });
 
   it('returns API_ERROR on other HTTP errors', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 500 });
 
-    const result = await generateSummary('transcript', 'sk-or-key');
+    const result = await generateSummary('transcript', 'sk-or-key', promptText, model);
     expect(result).toEqual({ success: false, error: 'API_ERROR' });
   });
 
@@ -88,7 +110,7 @@ describe('generateSummary', () => {
       json: async () => ({ choices: [] }),
     });
 
-    const result = await generateSummary('transcript', 'sk-or-key');
+    const result = await generateSummary('transcript', 'sk-or-key', promptText, model);
     expect(result).toEqual({ success: false, error: 'API_ERROR' });
   });
 
@@ -99,21 +121,21 @@ describe('generateSummary', () => {
       json: async () => ({}),
     });
 
-    const result = await generateSummary('transcript', 'sk-or-key');
+    const result = await generateSummary('transcript', 'sk-or-key', promptText, model);
     expect(result).toEqual({ success: false, error: 'API_ERROR' });
   });
 
   it('returns NETWORK_ERROR on fetch TypeError', async () => {
     mockFetch.mockRejectedValue(new TypeError('fetch failed'));
 
-    const result = await generateSummary('transcript', 'sk-or-key');
+    const result = await generateSummary('transcript', 'sk-or-key', promptText, model);
     expect(result).toEqual({ success: false, error: 'NETWORK_ERROR' });
   });
 
   it('returns API_ERROR on non-fetch errors', async () => {
     mockFetch.mockRejectedValue(new Error('something else'));
 
-    const result = await generateSummary('transcript', 'sk-or-key');
+    const result = await generateSummary('transcript', 'sk-or-key', promptText, model);
     expect(result).toEqual({ success: false, error: 'API_ERROR' });
   });
 });

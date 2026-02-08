@@ -1,15 +1,7 @@
 import { useState, useEffect } from 'react';
 import { validateApiKeyFormat, validateApiKeyServer } from '../services/apiKeyValidation';
 import { saveApiKey, loadApiKey } from '../services/storage';
-
-function Spinner({ className }: { className: string }): React.JSX.Element {
-  return (
-    <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
-  );
-}
+import { Spinner, BackButton } from './ui';
 
 type SettingsState = 'idle' | 'editing' | 'testing' | 'test-passed' | 'test-failed' | 'saving' | 'saved';
 
@@ -21,9 +13,10 @@ function maskKey(key: string): string {
 interface SettingsProps {
   onBack: () => void;
   onKeySaved: (key: string) => void;
+  onManagePrompts: () => void;
 }
 
-export function Settings({ onBack, onKeySaved }: SettingsProps): React.JSX.Element {
+export function Settings({ onBack, onKeySaved, onManagePrompts }: SettingsProps): React.JSX.Element {
   const [inputValue, setInputValue] = useState('');
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [settingsState, setSettingsState] = useState<SettingsState>('idle');
@@ -116,11 +109,7 @@ export function Settings({ onBack, onKeySaved }: SettingsProps): React.JSX.Eleme
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <header className="px-4 py-3 border-b border-gray-200 flex items-center">
-        <button onClick={onBack} className="mr-3 text-gray-600" aria-label="Back">
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
+        <BackButton onClick={onBack} />
         <h1 className="text-lg font-semibold text-gray-800">Settings</h1>
       </header>
 
@@ -207,6 +196,21 @@ export function Settings({ onBack, onKeySaved }: SettingsProps): React.JSX.Eleme
             <span>{statusMessage}</span>
           </div>
         )}
+
+        {/* Manage Prompts */}
+        <div className="pt-4 border-t border-gray-200">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Prompts</label>
+          <button
+            type="button"
+            onClick={onManagePrompts}
+            className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 hover:bg-gray-50 transition-colors"
+          >
+            <span>Manage Prompts</span>
+            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
 
         {/* Help Link */}
         <div className="pt-4 text-sm text-gray-500">

@@ -5,11 +5,15 @@ vi.mock('../../src/config', () => ({
   config: {
     openrouter: {
       apiUrl: 'https://openrouter.ai/api/v1',
-      model: 'openai/gpt-4o-mini',
     },
-    prompt: 'Summarize: {{transcript}}',
+    defaultModel: 'openai/gpt-4o-mini',
     maxTranscriptChars: 504000,
   },
+  openRouterHeaders: (apiKey: string) => ({
+    'Authorization': `Bearer ${apiKey}`,
+    'HTTP-Referer': 'https://magpie.app',
+    'X-Title': 'Magpie',
+  }),
 }));
 
 const mockFetch = vi.fn();

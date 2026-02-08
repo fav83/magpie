@@ -1,4 +1,4 @@
-import { config } from '../config';
+import { config, openRouterHeaders } from '../config';
 
 interface OpenRouterResponse {
   choices?: Array<{
@@ -10,20 +10,23 @@ interface OpenRouterResponse {
 
 export type SummaryError = 'INVALID_API_KEY' | 'RATE_LIMITED' | 'API_ERROR' | 'NETWORK_ERROR';
 
-export async function generateSummary(transcript: string, apiKey: string): Promise<{ success: true; data: string } | { success: false; error: SummaryError }> {
+export async function generateSummary(
+  transcript: string,
+  apiKey: string,
+  promptText: string,
+  model: string
+): Promise<{ success: true; data: string } | { success: false; error: SummaryError }> {
   try {
-    const content = config.prompt.replace('{{transcript}}', transcript);
+    const content = promptText.replace('{{transcript}}', transcript);
 
     const response = await fetch(`${config.openrouter.apiUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://magpie.app',
-        'X-Title': 'Magpie',
+        ...openRouterHeaders(apiKey),
       },
       body: JSON.stringify({
-        model: config.openrouter.model,
+        model,
         messages: [{ role: 'user', content }],
       }),
     });
