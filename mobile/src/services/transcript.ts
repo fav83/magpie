@@ -49,8 +49,8 @@ async function fetchVideoPage(videoId: string, signal?: AbortSignal): Promise<{ 
       },
     });
     // Capture set-cookie headers (getSetCookie is standard but not in all TS lib typings)
-    const getSetCookie = (resp.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
-    const setCookies: string[] = getSetCookie?.() ?? [];
+    const headers = resp.headers as Headers & { getSetCookie?: () => string[] };
+    const setCookies: string[] = headers.getSetCookie?.() ?? [];
     for (const c of setCookies) {
       const kv = c.split(';')[0];
       if (kv) {
