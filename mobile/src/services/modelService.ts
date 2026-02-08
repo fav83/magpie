@@ -5,6 +5,10 @@ export interface ModelInfo {
   name: string;
 }
 
+interface ModelsResponse {
+  data: Array<{ id: string; name: string }>;
+}
+
 let cachedModels: ModelInfo[] | null = null;
 let cachedForKey: string | null = null;
 
@@ -21,7 +25,7 @@ export async function fetchModels(apiKey: string): Promise<ModelInfo[]> {
     throw new Error(`Failed to fetch models: ${response.status}`);
   }
 
-  const data = await response.json() as { data: Array<{ id: string; name: string }> };
+  const data: ModelsResponse = await response.json();
 
   const models: ModelInfo[] = data.data
     .map((m) => ({ id: m.id, name: m.name }))

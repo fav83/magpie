@@ -1,20 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Prompt } from '../types/prompt';
-import type { ModelInfo } from '../services/modelService';
 import { validatePromptName, validatePromptText } from '../services/promptStorage';
+import { usePromptActions } from './PromptActionsContext';
 
 interface PromptAccordionItemProps {
   prompt: Prompt;
   isExpanded: boolean;
   onToggle: () => void;
-  models: ModelInfo[] | null;
-  modelsError: boolean;
-  onRetryModels: () => void;
-  onSave: (id: string, updates: { name: string; text: string; model: string }) => Promise<void>;
-  onSetDefault: (id: string) => void;
-  onDuplicate: (id: string) => void;
-  onDelete: (id: string) => void;
-  onReset: (id: string) => void;
   autoFocusName?: boolean;
 }
 
@@ -22,16 +14,9 @@ export function PromptAccordionItem({
   prompt,
   isExpanded,
   onToggle,
-  models,
-  modelsError,
-  onRetryModels,
-  onSave,
-  onSetDefault,
-  onDuplicate,
-  onDelete,
-  onReset,
   autoFocusName = false,
 }: PromptAccordionItemProps): React.JSX.Element {
+  const { models, modelsError, onRetryModels, onSave, onSetDefault, onDuplicate, onDelete, onReset } = usePromptActions();
   const [name, setName] = useState(prompt.name);
   const [text, setText] = useState(prompt.text);
   const [model, setModel] = useState(prompt.model);
@@ -92,7 +77,7 @@ export function PromptAccordionItem({
         className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs text-gray-400">{isExpanded ? '\u25BC' : '\u25B6'}</span>
+          <span className="text-xs text-gray-400">{isExpanded ? '\u25BC' /* ▼ */ : '\u25B6' /* ▶ */}</span>
           <span className="text-sm font-medium text-gray-800 truncate">{prompt.name}</span>
           {badges.map((badge) => (
             <span

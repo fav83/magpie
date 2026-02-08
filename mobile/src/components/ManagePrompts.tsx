@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Prompt } from '../types/prompt';
 import type { ModelInfo } from '../services/modelService';
 import { fetchModels, clearModelCache } from '../services/modelService';
@@ -13,6 +13,7 @@ import {
 } from '../services/promptStorage';
 import { PromptAccordionItem } from './PromptAccordionItem';
 import { ConfirmDialog } from './ConfirmDialog';
+import { PromptActionsProvider } from './PromptActionsContext';
 import { BackButton } from './ui';
 
 interface ManagePromptsProps {
@@ -122,6 +123,18 @@ export function ManagePrompts({ onBack, apiKey }: ManagePromptsProps): React.JSX
     setAutoFocusId(newPrompt.id);
   };
 
+  const actions = useMemo(() => ({
+    models,
+    modelsError,
+    onRetryModels: handleRetryModels,
+    onSave: handleSave,
+    onSetDefault: (id: string) => void handleSetDefault(id),
+    onDuplicate: (id: string) => void handleDuplicate(id),
+    onDelete: handleDeleteRequest,
+    onReset: handleResetRequest,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [models, modelsError, prompts]);
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
@@ -141,23 +154,17 @@ export function ManagePrompts({ onBack, apiKey }: ManagePromptsProps): React.JSX
 
       {/* Prompt List */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
-        {prompts.map((prompt) => (
-          <PromptAccordionItem
-            key={prompt.id}
-            prompt={prompt}
-            isExpanded={expandedId === prompt.id}
-            onToggle={() => handleToggle(prompt.id)}
-            models={models}
-            modelsError={modelsError}
-            onRetryModels={handleRetryModels}
-            onSave={handleSave}
-            onSetDefault={(id) => void handleSetDefault(id)}
-            onDuplicate={(id) => void handleDuplicate(id)}
-            onDelete={handleDeleteRequest}
-            onReset={handleResetRequest}
-            autoFocusName={autoFocusId === prompt.id}
-          />
-        ))}
+        <PromptActionsProvider value={actions}>
+          {prompts.map((prompt) => (
+            <PromptAccordionItem
+              key={prompt.id}
+              prompt={prompt}
+              isExpanded={expandedId === prompt.id}
+              onToggle={() => handleToggle(prompt.id)}
+              autoFocusName={autoFocusId === prompt.id}
+            />
+          ))}
+        </PromptActionsProvider>
       </div>
 
       {/* Confirmation Dialogs */}

@@ -16,10 +16,11 @@
     "@capacitor/app": "^6.0.0",
     "@capacitor/core": "^6.0.0",
     "@capacitor/preferences": "^6.0.0",
-    "send-intent": "^6.0.2",
+    "@capacitor/share": "^6.0.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "send-intent": "^6.0.2"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.0.0",
