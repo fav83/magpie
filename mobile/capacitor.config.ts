@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   plugins: {
     CapacitorHttp: {
-      enabled: true,
+      enabled: false,
     },
   },
   // Uncomment for live reload during development:

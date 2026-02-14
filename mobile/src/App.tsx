@@ -22,7 +22,18 @@ export function App(): React.JSX.Element {
   const { prompts, selectedPromptId, setSelectedPromptId, loadPromptData } = usePromptManager();
 
   const summarization = useSummarization({ url, apiKey, selectedPromptId });
-  const { state, summaryResult, errorMessage, setErrorMessage, noKeyError, handleSummarize } = summarization;
+  const {
+    state,
+    summaryResult,
+    displayContent,
+    errorMessage,
+    setErrorMessage,
+    noKeyError,
+    hasReceivedFirstChunk,
+    handleSummarize,
+    handleStop,
+    cancel,
+  } = summarization;
 
   // Keep a stable ref to handleSummarize for share intent auto-trigger
   const handleSummarizeRef = useRef(handleSummarize);
@@ -31,13 +42,22 @@ export function App(): React.JSX.Element {
   const resetRef = useRef(summarization.reset);
   resetRef.current = summarization.reset;
 
+  const cancelRef = useRef(cancel);
+  cancelRef.current = cancel;
+
   const resetMainScreen = useCallback(() => {
     setCurrentPage('main');
     resetRef.current();
   }, []);
 
+  // Auto-scroll state
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const userScrolledUpRef = useRef(false);
+
   const { pendingShareUrl, consumePendingUrl } = useShareIntent({
     onYouTubeUrl: (shareUrl) => {
+      // Cancel active stream if any (share collision)
+      cancelRef.current();
       resetMainScreen();
       setUrl(shareUrl);
     },
@@ -64,7 +84,44 @@ export function App(): React.JSX.Element {
     }
   }, [pendingShareUrl, apiKey, prompts, consumePendingUrl]);
 
-  const isLoading = state === 'fetching-transcript' || state === 'generating-summary';
+  // Track manual scroll-up
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      userScrolledUpRef.current = distanceFromBottom > 50;
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll on new streaming content
+  useEffect(() => {
+    if (state === 'streaming' && displayContent && !userScrolledUpRef.current) {
+      const container = scrollContainerRef.current;
+      if (container) {
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight;
+        });
+      }
+    }
+  }, [displayContent, state]);
+
+  // Reset scroll tracking on new summarization
+  useEffect(() => {
+    if (state === 'fetching-transcript') {
+      userScrolledUpRef.current = false;
+    }
+  }, [state]);
+
+  const isStreaming = state === 'streaming';
+  const isFetchingTranscript = state === 'fetching-transcript';
+  const isLoading = isFetchingTranscript || (isStreaming && !hasReceivedFirstChunk);
+  const showStopBar = isStreaming && hasReceivedFirstChunk;
+  const showFAB = state === 'done' && summaryResult !== null;
 
   if (currentPage === 'manage-prompts') {
     return (
@@ -89,7 +146,7 @@ export function App(): React.JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
       {/* Header */}
       <header className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -117,14 +174,14 @@ export function App(): React.JSX.Element {
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste YouTube URL"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={isLoading}
+          disabled={isFetchingTranscript}
         />
 
         {/* Prompt Selector */}
         <select
           value={selectedPromptId ?? ''}
           onChange={(e) => setSelectedPromptId(e.target.value)}
-          disabled={isLoading}
+          disabled={isFetchingTranscript || isStreaming}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
         >
           {prompts.map((p) => (
@@ -134,40 +191,88 @@ export function App(): React.JSX.Element {
           ))}
         </select>
 
-        <button
-          type="button"
-          onClick={() => void handleSummarize()}
-          disabled={isLoading}
-          className={`w-full py-2 px-4 text-sm font-medium rounded-lg transition-colors ${
-            isLoading
-              ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          {isLoading ? (
+        {/* Action button: Summarize / Fetching / Stop */}
+        {isStreaming ? (
+          <button
+            type="button"
+            onClick={handleStop}
+            className="w-full py-2 px-4 text-sm font-medium rounded-lg transition-colors bg-red-600 text-white hover:bg-red-700"
+          >
             <span className="flex items-center justify-center gap-2">
-              <Spinner className="h-4 w-4" />
-              {state === 'fetching-transcript' ? 'Fetching transcript...' : 'Generating summary...'}
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              </svg>
+              Stop
             </span>
-          ) : (
-            'Summarize'
-          )}
-        </button>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void handleSummarize()}
+            disabled={isFetchingTranscript}
+            className={`w-full py-2 px-4 text-sm font-medium rounded-lg transition-colors ${
+              isFetchingTranscript
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {isFetchingTranscript ? (
+              <span className="flex items-center justify-center gap-2">
+                <Spinner className="h-4 w-4" />
+                Fetching transcript...
+              </span>
+            ) : (
+              'Summarize'
+            )}
+          </button>
+        )}
       </div>
 
       {/* Summary / Status area */}
-      <div className="flex-1 px-4 py-2 overflow-y-auto">
-        {isLoading && <LoadingIndicator state={state} />}
+      <div
+        ref={scrollContainerRef}
+        className={`flex-1 px-4 py-2 overflow-y-auto ${showStopBar ? 'pb-16' : showFAB ? 'pb-24' : ''}`}
+      >
+        {isLoading && <LoadingIndicator state="fetching-transcript" />}
 
-        {errorMessage && !isLoading && (
+        {/* Streaming content */}
+        {isStreaming && hasReceivedFirstChunk && (
+          <SummaryView summary={displayContent} isStreaming />
+        )}
+
+        {/* Error with possible partial content */}
+        {state === 'error' && summaryResult && (
+          <SummaryView summary={summaryResult.summary} />
+        )}
+
+        {/* Error banner — show for both validation errors (idle state) and runtime errors */}
+        {errorMessage && !isLoading && !isStreaming && (
           <ErrorBanner
             message={errorMessage}
             onGoToSettings={noKeyError ? () => setCurrentPage('settings') : undefined}
+            onRetry={!noKeyError && state === 'error' ? () => void handleSummarize() : undefined}
           />
         )}
 
+        {/* Completed summary */}
         {state === 'done' && summaryResult && <SummaryView summary={summaryResult.summary} />}
       </div>
+
+      {/* Floating stop bar */}
+      {showStopBar && (
+        <div className="fixed bottom-6 left-0 right-0 flex justify-center z-10 pointer-events-none">
+          <button
+            type="button"
+            onClick={handleStop}
+            className="pointer-events-auto flex items-center gap-2 px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-full shadow-lg hover:bg-gray-700 transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="1" />
+            </svg>
+            Stop generating
+          </button>
+        </div>
+      )}
 
       <SpeedDialFAB
         visible={state === 'done' && summaryResult !== null}

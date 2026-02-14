@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { isValidYouTubeUrl, extractVideoId } from '../utils/youtube';
 import { fetchTranscript } from '../services/transcript';
-import { generateSummary } from '../services/openrouter';
+import { streamSummary } from '../services/streamingOpenrouter';
 import { getPromptById } from '../services/promptStorage';
+import { useBufferedMarkdown } from './useBufferedMarkdown';
 import { config } from '../config';
 
 export interface SummaryResult {
@@ -11,7 +12,7 @@ export interface SummaryResult {
   url: string;
 }
 
-export type SummarizationState = 'idle' | 'fetching-transcript' | 'generating-summary' | 'done' | 'error';
+export type SummarizationState = 'idle' | 'fetching-transcript' | 'streaming' | 'done' | 'error';
 
 const ERROR_MESSAGES: Record<string, string> = {
   INVALID_URL: 'Please enter a valid YouTube video URL',
@@ -41,9 +42,15 @@ export function useSummarization({ url, apiKey, selectedPromptId }: UseSummariza
   const [summaryResult, setSummaryResult] = useState<SummaryResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [noKeyError, setNoKeyError] = useState(false);
+  const [hasReceivedFirstChunk, setHasReceivedFirstChunk] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const stopRef = useRef(false);
+  const titleRef = useRef('');
+  const targetUrlRef = useRef('');
 
-  const handleSummarize = async (urlOverride?: string) => {
+  const bufferedMarkdown = useBufferedMarkdown();
+
+  const handleSummarize = useCallback(async (urlOverride?: string) => {
     if (!apiKey) {
       setNoKeyError(true);
       setErrorMessage('API key not configured.');
@@ -66,10 +73,18 @@ export function useSummarization({ url, apiKey, selectedPromptId }: UseSummariza
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+    stopRef.current = false;
 
-    // Phase 1: Fetch transcript
+    // Reset state
     setSummaryResult(null);
     setErrorMessage('');
+    setHasReceivedFirstChunk(false);
+    bufferedMarkdown.reset();
+
+    const targetUrl = (urlOverride ?? url).trim();
+    targetUrlRef.current = targetUrl;
+
+    // Phase 1: Fetch transcript
     setState('fetching-transcript');
 
     const transcriptResult = await fetchTranscript(videoId, controller.signal);
@@ -86,46 +101,110 @@ export function useSummarization({ url, apiKey, selectedPromptId }: UseSummariza
       return;
     }
 
-    // Phase 2: Generate summary
-    setState('generating-summary');
+    titleRef.current = transcriptResult.data.title;
 
-    const genResult = await generateSummary(
-      transcriptResult.data.transcript,
-      apiKey,
-      promptText,
-      model,
-      controller.signal
-    );
-    if (!genResult.success) {
-      if (controller.signal.aborted) return;
-      setState('error');
-      setErrorMessage(ERROR_MESSAGES[genResult.error] ?? 'Failed to generate summary.');
-      return;
+    // Phase 2: Stream summary
+    setState('streaming');
+
+    try {
+      await streamSummary({
+        transcript: transcriptResult.data.transcript,
+        apiKey,
+        promptText,
+        model,
+        signal: controller.signal,
+        callbacks: {
+          onChunk: (content) => {
+            setHasReceivedFirstChunk(true);
+            bufferedMarkdown.appendChunk(content);
+          },
+          onComplete: (fullContent) => {
+            bufferedMarkdown.flush();
+            setSummaryResult({
+              summary: fullContent,
+              title: titleRef.current,
+              url: targetUrlRef.current,
+            });
+            setState('done');
+          },
+          onError: (error, partialContent, errorDetails) => {
+            bufferedMarkdown.flush();
+            if (partialContent) {
+              setSummaryResult({
+                summary: partialContent,
+                title: titleRef.current,
+                url: targetUrlRef.current,
+              });
+            }
+            setState('error');
+            const baseMessage = ERROR_MESSAGES[error] ?? 'Failed to generate summary.';
+            setErrorMessage(errorDetails ? `${baseMessage} (${errorDetails})` : baseMessage);
+          },
+        },
+      });
+    } catch (error) {
+      // Abort errors (user stop or share collision)
+      if (
+        error instanceof DOMException && error.name === 'AbortError' ||
+        (error instanceof Error && error.name === 'StreamAbortedError')
+      ) {
+        if (stopRef.current) {
+          // User pressed stop — treat partial content as done
+          bufferedMarkdown.flush();
+          const partialContent = bufferedMarkdown.getFullContent();
+          if (partialContent) {
+            const stoppedContent = partialContent + '\n\n---\n*Summary stopped by user*';
+            setSummaryResult({
+              summary: stoppedContent,
+              title: titleRef.current,
+              url: targetUrlRef.current,
+            });
+          }
+          setState('done');
+        }
+        // If not stopRef (share collision), caller already reset state — just return
+        return;
+      }
+
+      // Unexpected error
+      if (!controller.signal.aborted) {
+        bufferedMarkdown.flush();
+        setState('error');
+        setErrorMessage(ERROR_MESSAGES.API_ERROR ?? 'Failed to generate summary.');
+      }
     }
+  }, [url, apiKey, selectedPromptId, bufferedMarkdown]);
 
-    const targetUrl = (urlOverride ?? url).trim();
-    setSummaryResult({
-      summary: genResult.data,
-      title: transcriptResult.data.title,
-      url: targetUrl,
-    });
-    setState('done');
-  };
+  const handleStop = useCallback(() => {
+    stopRef.current = true;
+    abortRef.current?.abort();
+  }, []);
 
-  const reset = () => {
+  const cancel = useCallback(() => {
+    stopRef.current = false;
+    abortRef.current?.abort();
+  }, []);
+
+  const reset = useCallback(() => {
     setState('idle');
     setSummaryResult(null);
     setErrorMessage('');
     setNoKeyError(false);
-  };
+    setHasReceivedFirstChunk(false);
+    bufferedMarkdown.reset();
+  }, [bufferedMarkdown]);
 
   return {
     state,
     summaryResult,
+    displayContent: bufferedMarkdown.displayContent,
     errorMessage,
     setErrorMessage,
     noKeyError,
+    hasReceivedFirstChunk,
     handleSummarize,
+    handleStop,
+    cancel,
     reset,
   };
 }

@@ -1,3 +1,4 @@
+import { CapacitorHttp } from '@capacitor/core';
 import type { Result } from '../types/result';
 
 export interface TranscriptResult {
@@ -10,10 +11,6 @@ export type TranscriptError = 'NO_CAPTIONS' | 'EXTRACTION_FAILED' | 'NETWORK_ERR
 const WATCH_URL = 'https://www.youtube.com/watch?v=';
 const INNERTUBE_API_URL = 'https://www.youtube.com/youtubei/v1/player?key=';
 const INNERTUBE_CONTEXT = { client: { clientName: 'ANDROID', clientVersion: '20.10.38' } };
-
-export function formatCookies(cookies: Record<string, string>): string {
-  return Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join('; ');
-}
 
 export interface CaptionTrack {
   baseUrl: string;
@@ -34,47 +31,39 @@ interface InnerTubeResponse {
 
 /**
  * Fetches the YouTube watch page HTML, handling the GDPR consent flow.
- * Returns the page HTML and any cookies set during the flow.
+ * Uses CapacitorHttp for CORS-free native HTTP requests.
  */
-async function fetchVideoPage(videoId: string, signal?: AbortSignal): Promise<{ html: string; cookies: Record<string, string> }> {
-  const cookies: Record<string, string> = {};
+async function fetchVideoPage(videoId: string, signal?: AbortSignal): Promise<{ html: string }> {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
-  const doFetch = async (): Promise<string> => {
-    const cookieStr = formatCookies(cookies);
-    const resp = await fetch(WATCH_URL + videoId, {
-      signal: signal ?? null,
-      headers: {
-        'Accept-Language': 'en-US',
-        ...(cookieStr ? { 'Cookie': cookieStr } : {}),
-      },
-    });
-    // Capture set-cookie headers (getSetCookie is standard but not in all TS lib typings)
-    const headers = resp.headers as Headers & { getSetCookie?: () => string[] };
-    const setCookies: string[] = headers.getSetCookie?.() ?? [];
-    for (const c of setCookies) {
-      const kv = c.split(';')[0];
-      if (kv) {
-        const eqIdx = kv.indexOf('=');
-        if (eqIdx > 0) {
-          cookies[kv.substring(0, eqIdx)] = kv.substring(eqIdx + 1);
-        }
-      }
-    }
-    return resp.text();
-  };
+  const resp = await CapacitorHttp.get({
+    url: WATCH_URL + videoId,
+    headers: {
+      'Accept-Language': 'en-US',
+      'Cookie': 'CONSENT=YES+1',
+    },
+  });
 
-  let html = await doFetch();
+  let html = resp.data as string;
 
   // Handle GDPR consent page
   if (html.includes('action="https://consent.youtube.com/s"')) {
     const match = html.match(/name="v" value="(.*?)"/);
     if (match?.[1]) {
-      cookies['CONSENT'] = 'YES+' + match[1];
-      html = await doFetch();
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+      const resp2 = await CapacitorHttp.get({
+        url: WATCH_URL + videoId,
+        headers: {
+          'Accept-Language': 'en-US',
+          'Cookie': 'CONSENT=YES+' + match[1],
+        },
+      });
+      html = resp2.data as string;
     }
   }
 
-  return { html, cookies };
+  return { html };
 }
 
 /**
@@ -88,28 +77,28 @@ export function extractApiKey(html: string): string | null {
 /**
  * Calls the InnerTube player API with ANDROID client context to get
  * caption track URLs that work without PoToken authentication.
+ * Uses CapacitorHttp for CORS-free native HTTP requests.
  */
-async function fetchInnerTubeData(videoId: string, apiKey: string, cookies: Record<string, string>, signal?: AbortSignal): Promise<InnerTubeResponse> {
-  const cookieStr = formatCookies(cookies);
-  const resp = await fetch(INNERTUBE_API_URL + apiKey, {
-    method: 'POST',
-    signal: signal ?? null,
+async function fetchInnerTubeData(videoId: string, apiKey: string, signal?: AbortSignal): Promise<InnerTubeResponse> {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+  const resp = await CapacitorHttp.post({
+    url: INNERTUBE_API_URL + apiKey,
     headers: {
       'Content-Type': 'application/json',
       'Accept-Language': 'en-US',
-      ...(cookieStr ? { 'Cookie': cookieStr } : {}),
     },
-    body: JSON.stringify({
+    data: {
       context: INNERTUBE_CONTEXT,
       videoId,
-    }),
+    },
   });
 
-  if (!resp.ok) {
+  if (resp.status < 200 || resp.status >= 300) {
     throw new Error(`InnerTube API returned ${String(resp.status)}`);
   }
 
-  return resp.json() as Promise<InnerTubeResponse>;
+  return resp.data as InnerTubeResponse;
 }
 
 /**
@@ -175,7 +164,7 @@ export function parseTranscriptXml(xml: string): string[] {
 export async function fetchTranscript(videoId: string, signal?: AbortSignal): Promise<Result<TranscriptResult, TranscriptError>> {
   try {
     // Step 1: Fetch page HTML (handles consent)
-    const { html, cookies } = await fetchVideoPage(videoId, signal);
+    const { html } = await fetchVideoPage(videoId, signal);
 
     // Step 2: Extract API key
     const apiKey = extractApiKey(html);
@@ -184,7 +173,7 @@ export async function fetchTranscript(videoId: string, signal?: AbortSignal): Pr
     }
 
     // Step 3: Call InnerTube API with ANDROID client
-    const data = await fetchInnerTubeData(videoId, apiKey, cookies, signal);
+    const data = await fetchInnerTubeData(videoId, apiKey, signal);
 
     const title = data.videoDetails?.title ?? 'Unknown';
 
@@ -208,21 +197,22 @@ export async function fetchTranscript(videoId: string, signal?: AbortSignal): Pr
     // Strip fmt=srv3 from URL (get default XML format)
     const captionUrl = track.baseUrl.replace('&fmt=srv3', '');
 
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
     // Step 6: Fetch caption XML
-    const cookieStr = formatCookies(cookies);
-    const captionResp = await fetch(captionUrl, {
-      signal: signal ?? null,
+    const captionResp = await CapacitorHttp.get({
+      url: captionUrl,
       headers: {
         'Accept-Language': 'en-US',
-        ...(cookieStr ? { 'Cookie': cookieStr } : {}),
       },
+      responseType: 'text',
     });
 
-    if (!captionResp.ok) {
+    if (captionResp.status < 200 || captionResp.status >= 300) {
       return { success: false, error: 'EXTRACTION_FAILED' };
     }
 
-    const xml = await captionResp.text();
+    const xml = captionResp.data as string;
     if (!xml || xml.length === 0) {
       return { success: false, error: 'NO_CAPTIONS' };
     }
@@ -235,6 +225,9 @@ export async function fetchTranscript(videoId: string, signal?: AbortSignal): Pr
 
     return { success: true, data: { transcript: lines.join('\n'), title } };
   } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return { success: false, error: 'NETWORK_ERROR' };
+    }
     if (error instanceof TypeError && (error as TypeError).message.includes('fetch')) {
       return { success: false, error: 'NETWORK_ERROR' };
     }

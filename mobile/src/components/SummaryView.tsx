@@ -1,9 +1,15 @@
 import Markdown from 'react-markdown';
 
-export function SummaryView({ summary }: { summary: string }): React.JSX.Element {
+interface SummaryViewProps {
+  summary: string;
+  isStreaming?: boolean;
+}
+
+export function SummaryView({ summary, isStreaming }: SummaryViewProps): React.JSX.Element {
   return (
     <div className="prose prose-sm max-w-none text-gray-800">
       <Markdown>{summary}</Markdown>
+      {isStreaming && <span className="animate-blink text-gray-400">&#9610;</span>}
     </div>
   );
 }

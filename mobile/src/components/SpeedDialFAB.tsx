@@ -112,7 +112,7 @@ export function SpeedDialFAB({ visible, onShare, onCopy }: SpeedDialFABProps): R
       />
 
       {/* Speed dial container */}
-      <div className="fixed bottom-6 right-4" style={{ zIndex: 50 }}>
+      <div className="fixed bottom-3 right-0" style={{ zIndex: 50 }}>
         {/* Speed dial items */}
         <div className="flex flex-col items-end gap-3 mb-3">
           <SpeedDialItem
