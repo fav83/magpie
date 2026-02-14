@@ -96,6 +96,8 @@ adb shell cmd media_session volume --set 1 --stream 4  # alarm min is 1
 
 ### 2. Build & Deploy
 
+**The app MUST be built from source on every test run.** Claude must never skip the build or fall back to a previously built APK. The build is the first gate — if the code doesn't compile, tests cannot run.
+
 Execute the full build pipeline from the `mobile/` directory:
 
 ```
@@ -104,6 +106,16 @@ npm run build          # TypeScript check + Vite build → dist/
 npx cap sync android   # Sync web assets to Android project
 cd android && ./gradlew assembleDebug   # Build APK
 ```
+
+**If any step in the build pipeline fails, Claude must STOP the entire test run immediately.** Do not attempt to:
+- Use an existing APK from a previous build
+- Skip the failing step and continue
+- Fix the build error and retry
+
+Instead, Claude must:
+1. Report the build failure to the user with the full error output
+2. Generate an abbreviated test report marking T-01 as FAIL (build error) and all remaining scenarios as SKIPPED
+3. End the test run
 
 Install the APK on the emulator:
 
@@ -321,6 +333,22 @@ When summarization or chat is streaming (10-60+ seconds):
 - **Navigation:** Back buttons have `aria-label="Back"`, settings button has `aria-label="Settings"`
 - **Waiting for transitions:** After navigation, wait 500ms then dump the UI tree to confirm the new screen loaded
 - **Chat testing:** Keep chat questions short and specific (e.g., "Main topic?" or "What is time?"). Avoid asking for long-form content like essays, as the responses can push the chat header Copy all/Clear buttons beyond scrollable reach.
+
+### Never Pause or Wait for User Input
+
+**Claude must never stop and wait for user acknowledgement during the test run.** After taking a screenshot, dumping the UI tree, or completing any assertion, Claude must immediately continue to the next step. Specifically:
+
+- After reading/viewing a screenshot: **continue immediately** — do not pause to "show" or "present" the screenshot to the user
+- After completing a test scenario: **continue immediately** to the next scenario
+- After any tool call returns: **continue immediately** with the next action
+- After outputting a progress line: **continue immediately** — do not wait for user response
+
+The only valid reasons to stop are:
+1. The build fails (per the Build & Deploy rules above)
+2. All 48 scenarios have been completed
+3. A critical failure makes the emulator/app completely unusable (crash loop, emulator offline)
+
+If Claude finds itself about to pause and wait, it should instead proceed with the next step.
 
 ### No Bug Fixing During Test Runs
 
@@ -982,5 +1010,17 @@ All screenshots are saved to `docs/e2e-screenshots/` with naming convention:
 - **Keyboard dismissal:** After typing in text fields, the soft keyboard may cover lower UI elements. Use `keyevent 4` (BACK) to dismiss the keyboard before interacting with buttons below.
 - **Dynamic content:** Model lists and YouTube search results are dynamic. Assertions should check for the presence of elements and general patterns, not exact text matches (except for known values like prompt names).
 - **Token budget:** Be economical with screenshots. The runbook specifies approximately 12-15 screenshots across all 48 scenarios. Use the UI tree dump for all other assertions.
-- **Chat streaming:** The chat feature uses the same SSE streaming infrastructure as summarization. Apply the same `wait_for_done` polling strategy for chat responses as for summary streaming.
+- **Chat streaming:** See [Chat Response Polling](#chat-response-polling) below for the correct polling strategy. Do NOT reuse `wait_for_done` directly — chat completion signals differ from summarization.
+
+### Chat Response Polling
+
+The chat feature uses the same SSE streaming infrastructure as summarization, but the **completion signal is different**. The `wait_for_done` helper looks for the "Summarize" button to reappear, which doesn't apply to chat.
+
+**Do NOT** check whether the Send button is enabled as a completion signal. The Send button is disabled whenever the text input is empty, regardless of whether streaming is in progress. This causes false negatives (polling sees "disabled" and keeps waiting even though the response is already complete).
+
+**Correct approach:** Poll the UI tree every 3 seconds and check for these signals:
+
+- **Streaming in progress:** "Stop" or "Stop generating" button is present in the UI tree
+- **Response complete:** Stop button is gone AND new substantial text content (>50 chars) is present in the chat area
+- **Timeout:** 120 seconds — log as failure
 - **ConfirmDialogs:** CSS modal overlays are invisible to `uiautomator dump`. Use screenshots to verify they appeared, then tap at known coordinates (Cancel: ~666,1332 / Confirm: ~882,1332).
