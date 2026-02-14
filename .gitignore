@@ -35,5 +35,9 @@ playground/
 CLAUDE.md
 AGENTS.md
 
+# E2E test reports and screenshots
+docs/e2e-report-*.md
+docs/e2e-screenshots/
+
 # Internal docs (not for public)
 .internal/

@@ -84,6 +84,16 @@ Check for existing AVDs. If none are available, create one:
 
 Boot the emulator and wait for it to be fully ready (device online via `adb devices`, boot animation complete).
 
+Mute all audio streams so ADB interactions don't produce sound:
+
+```bash
+# Streams: 1=system, 2=ring, 3=music, 4=alarm, 5=notification
+for stream in 1 2 3 5; do
+  adb shell cmd media_session volume --set 0 --stream $stream
+done
+adb shell cmd media_session volume --set 1 --stream 4  # alarm min is 1
+```
+
 ### 2. Build & Deploy
 
 Execute the full build pipeline from the `mobile/` directory:
@@ -122,6 +132,7 @@ Before starting the test run:
 - [ ] API key is ready (not hardcoded in runbook)
 - [ ] `npm install` in both root and `mobile/` directories
 - [ ] No stale app data (consider `pm clear` before T-01)
+- [ ] Emulator audio muted (all streams set to 0)
 - [ ] 3 YouTube test videos found and verified (captions confirmed)
 
 ---
@@ -892,7 +903,7 @@ When a test scenario fails:
 
 ## Test Report Format
 
-After all scenarios have been executed, Claude generates a Markdown report saved to `docs/e2e-report-YYYY-MM-DD.md`:
+After all scenarios have been executed, Claude generates a **new** Markdown report saved to `docs/e2e-report-YYYY-MM-DD-HHMMSS.md` (with timestamp to avoid overwriting previous reports). Never update or overwrite an existing report — each run produces its own file:
 
 ```markdown
 # E2E Test Report — YYYY-MM-DD HH:MM
