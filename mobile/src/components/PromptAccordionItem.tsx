@@ -16,7 +16,7 @@ export function PromptAccordionItem({
   onToggle,
   autoFocusName = false,
 }: PromptAccordionItemProps): React.JSX.Element {
-  const { models, modelsError, onRetryModels, onSave, onSetDefault, onDuplicate, onDelete, onReset } = usePromptActions();
+  const { models, modelsError, favoriteIds, onRetryModels, onSave, onSetDefault, onDuplicate, onDelete, onReset } = usePromptActions();
   const [name, setName] = useState(prompt.name);
   const [text, setText] = useState(prompt.text);
   const [model, setModel] = useState(prompt.model);
@@ -127,16 +127,35 @@ export function PromptAccordionItem({
                 onChange={(e) => setModel(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
               >
-                {/* Always show current model */}
+                {/* Always show current model if not in list */}
                 {models && !models.some((m) => m.id === model) && (
                   <option value={model}>{model}</option>
                 )}
                 {models ? (
-                  models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))
+                  <>
+                    {(() => {
+                      const favModels = models.filter((m) => favoriteIds.has(m.id)).sort((a, b) => a.name.localeCompare(b.name));
+                      const otherModels = models.filter((m) => !favoriteIds.has(m.id)).sort((a, b) => a.name.localeCompare(b.name));
+                      return (
+                        <>
+                          {favModels.length > 0 && (
+                            <optgroup label="Favorites">
+                              {favModels.map((m) => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {otherModels.length > 0 && (
+                            <optgroup label="All Models">
+                              {otherModels.map((m) => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </>
                 ) : (
                   <option value={model}>{model}</option>
                 )}

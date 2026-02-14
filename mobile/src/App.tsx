@@ -1,27 +1,34 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { loadApiKey } from './services/storage';
 import { shareSummary, copySummary } from './services/shareSummary';
+import { fetchModels } from './services/modelService';
+import type { ModelInfo } from './services/modelService';
 import { usePromptManager } from './hooks/usePromptManager';
 import { useSummarization } from './hooks/useSummarization';
 import { useShareIntent } from './hooks/useShareIntent';
+import { useFavoriteModels } from './hooks/useFavoriteModels';
 import { Settings } from './components/Settings';
 import { ManagePrompts } from './components/ManagePrompts';
+import { ManageFavoriteModels } from './components/ManageFavoriteModels';
 import { LoadingIndicator } from './components/LoadingIndicator';
 import { ErrorBanner } from './components/ErrorBanner';
 import { SummaryView } from './components/SummaryView';
 import { SpeedDialFAB } from './components/SpeedDialFAB';
 import { Spinner } from './components/ui';
 
-type Page = 'main' | 'settings' | 'manage-prompts';
+type Page = 'main' | 'settings' | 'manage-prompts' | 'manage-favorite-models';
 
 export function App(): React.JSX.Element {
   const [url, setUrl] = useState('');
   const [currentPage, setCurrentPage] = useState<Page>('main');
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [modelOverride, setModelOverride] = useState<string | null>(null);
+  const [models, setModels] = useState<ModelInfo[]>([]);
 
   const { prompts, selectedPromptId, setSelectedPromptId, loadPromptData } = usePromptManager();
+  const { favoriteIds, reloadFavorites } = useFavoriteModels();
 
-  const summarization = useSummarization({ url, apiKey, selectedPromptId });
+  const summarization = useSummarization({ url, apiKey, selectedPromptId, modelOverride });
   const {
     state,
     summaryResult,
@@ -74,6 +81,18 @@ export function App(): React.JSX.Element {
     void loadPromptData();
   }, [loadPromptData]);
 
+  // Load models for display names
+  useEffect(() => {
+    if (apiKey) {
+      void fetchModels(apiKey).then(setModels).catch(() => {});
+    }
+  }, [apiKey]);
+
+  // Reset model override when prompt changes
+  useEffect(() => {
+    setModelOverride(null);
+  }, [selectedPromptId]);
+
   // Auto-summarize when a share URL is pending and app data is ready
   useEffect(() => {
     if (pendingShareUrl && apiKey && prompts.length > 0) {
@@ -123,6 +142,18 @@ export function App(): React.JSX.Element {
   const showStopBar = isStreaming && hasReceivedFirstChunk;
   const showFAB = state === 'done' && summaryResult !== null;
 
+  if (currentPage === 'manage-favorite-models') {
+    return (
+      <ManageFavoriteModels
+        onBack={() => {
+          setCurrentPage('settings');
+          reloadFavorites();
+        }}
+        apiKey={apiKey}
+      />
+    );
+  }
+
   if (currentPage === 'manage-prompts') {
     return (
       <ManagePrompts
@@ -140,6 +171,7 @@ export function App(): React.JSX.Element {
       <Settings
         onBack={() => setCurrentPage('main')}
         onKeySaved={(key) => setApiKey(key)}
+        onManageFavoriteModels={() => setCurrentPage('manage-favorite-models')}
         onManagePrompts={() => setCurrentPage('manage-prompts')}
       />
     );
@@ -166,73 +198,106 @@ export function App(): React.JSX.Element {
         </button>
       </header>
 
-      {/* Input area */}
-      <div className="px-4 pt-4 pb-2 space-y-3">
-        <input
-          type="text"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="Paste YouTube URL"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={isFetchingTranscript}
-        />
-
-        {/* Prompt Selector */}
-        <select
-          value={selectedPromptId ?? ''}
-          onChange={(e) => setSelectedPromptId(e.target.value)}
-          disabled={isFetchingTranscript || isStreaming}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-        >
-          {prompts.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}{p.isDefault ? ' (Default)' : ''}
-            </option>
-          ))}
-        </select>
-
-        {/* Action button: Summarize / Fetching / Stop */}
-        {isStreaming ? (
-          <button
-            type="button"
-            onClick={handleStop}
-            className="w-full py-2 px-4 text-sm font-medium rounded-lg transition-colors bg-red-600 text-white hover:bg-red-700"
-          >
-            <span className="flex items-center justify-center gap-2">
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="1" />
-              </svg>
-              Stop
-            </span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void handleSummarize()}
-            disabled={isFetchingTranscript}
-            className={`w-full py-2 px-4 text-sm font-medium rounded-lg transition-colors ${
-              isFetchingTranscript
-                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
-          >
-            {isFetchingTranscript ? (
-              <span className="flex items-center justify-center gap-2">
-                <Spinner className="h-4 w-4" />
-                Fetching transcript...
-              </span>
-            ) : (
-              'Summarize'
-            )}
-          </button>
-        )}
-      </div>
-
-      {/* Summary / Status area */}
+      {/* Scrollable content: input area + summary */}
       <div
         ref={scrollContainerRef}
-        className={`flex-1 px-4 py-2 overflow-y-auto ${showStopBar ? 'pb-16' : showFAB ? 'pb-24' : ''}`}
+        className={`flex-1 overflow-y-auto ${showStopBar ? 'pb-16' : showFAB ? 'pb-24' : ''}`}
       >
+        {/* Input area */}
+        <div className="px-4 pt-4 pb-2 space-y-3">
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Paste YouTube URL"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={isFetchingTranscript}
+          />
+
+          {/* Prompt + Model Selectors */}
+          <div className="flex gap-2">
+            <select
+              value={selectedPromptId ?? ''}
+              onChange={(e) => setSelectedPromptId(e.target.value)}
+              disabled={isFetchingTranscript || isStreaming}
+              className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            >
+              {prompts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.isDefault ? ' (Default)' : ''}
+                </option>
+              ))}
+            </select>
+            <select
+              value={modelOverride ?? prompts.find((p) => p.id === selectedPromptId)?.model ?? ''}
+              onChange={(e) => setModelOverride(e.target.value)}
+              disabled={isFetchingTranscript || isStreaming}
+              className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            >
+              {(() => {
+                const selectedPrompt = prompts.find((p) => p.id === selectedPromptId);
+                const effectiveModel = modelOverride ?? selectedPrompt?.model ?? '';
+                const favoriteModels = models
+                  .filter((m) => favoriteIds.has(m.id))
+                  .sort((a, b) => a.name.localeCompare(b.name));
+                // If current model isn't a favorite, show it as an extra option
+                const showCurrentAsExtra = effectiveModel && !favoriteIds.has(effectiveModel);
+                const currentModelInfo = models.find((m) => m.id === effectiveModel);
+                return (
+                  <>
+                    {showCurrentAsExtra && (
+                      <option value={effectiveModel}>
+                        {currentModelInfo?.name ?? effectiveModel}
+                      </option>
+                    )}
+                    {favoriteModels.map((m) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </>
+                );
+              })()}
+            </select>
+          </div>
+
+          {/* Action button: Summarize / Fetching / Stop */}
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={handleStop}
+              className="w-full py-2 px-4 text-sm font-medium rounded-lg transition-colors bg-red-600 text-white hover:bg-red-700"
+            >
+              <span className="flex items-center justify-center gap-2">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
+                </svg>
+                Stop
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void handleSummarize()}
+              disabled={isFetchingTranscript}
+              className={`w-full py-2 px-4 text-sm font-medium rounded-lg transition-colors ${
+                isFetchingTranscript
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {isFetchingTranscript ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Spinner className="h-4 w-4" />
+                  Fetching transcript...
+                </span>
+              ) : (
+                'Summarize'
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* Summary / Status area */}
+        <div className="px-4 py-2">
         {isLoading && <LoadingIndicator state="fetching-transcript" />}
 
         {/* Streaming content */}
@@ -256,6 +321,7 @@ export function App(): React.JSX.Element {
 
         {/* Completed summary */}
         {state === 'done' && summaryResult && <SummaryView summary={summaryResult.summary} />}
+        </div>
       </div>
 
       {/* Floating stop bar */}

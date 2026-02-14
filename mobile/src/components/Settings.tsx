@@ -53,10 +53,11 @@ function maskKey(key: string): string {
 interface SettingsProps {
   onBack: () => void;
   onKeySaved: (key: string) => void;
+  onManageFavoriteModels: () => void;
   onManagePrompts: () => void;
 }
 
-export function Settings({ onBack, onKeySaved, onManagePrompts }: SettingsProps): React.JSX.Element {
+export function Settings({ onBack, onKeySaved, onManageFavoriteModels, onManagePrompts }: SettingsProps): React.JSX.Element {
   const [inputValue, setInputValue] = useState('');
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [form, dispatch] = useReducer(settingsReducer, { phase: 'idle', statusMessage: '', statusType: 'info' });
@@ -209,6 +210,21 @@ export function Settings({ onBack, onKeySaved, onManagePrompts }: SettingsProps)
             <span>{form.statusMessage}</span>
           </div>
         )}
+
+        {/* Manage Favorite Models */}
+        <div className="pt-4 border-t border-gray-200">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Models</label>
+          <button
+            type="button"
+            onClick={onManageFavoriteModels}
+            className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 hover:bg-gray-50 transition-colors"
+          >
+            <span>Manage Favorite Models</span>
+            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
 
         {/* Manage Prompts */}
         <div className="pt-4 border-t border-gray-200">

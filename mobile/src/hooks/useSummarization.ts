@@ -35,9 +35,10 @@ interface UseSummarizationParams {
   url: string;
   apiKey: string | null;
   selectedPromptId: string | null;
+  modelOverride?: string | null;
 }
 
-export function useSummarization({ url, apiKey, selectedPromptId }: UseSummarizationParams) {
+export function useSummarization({ url, apiKey, selectedPromptId, modelOverride }: UseSummarizationParams) {
   const [state, setState] = useState<SummarizationState>('idle');
   const [summaryResult, setSummaryResult] = useState<SummaryResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -67,7 +68,7 @@ export function useSummarization({ url, apiKey, selectedPromptId }: UseSummariza
     // Get the selected prompt
     const prompt = selectedPromptId ? await getPromptById(selectedPromptId) : null;
     const promptText = prompt?.text ?? '{{transcript}}';
-    const model = prompt?.model ?? config.defaultModel;
+    const model = modelOverride ?? prompt?.model ?? config.defaultModel;
 
     // Cancel any in-flight request
     abortRef.current?.abort();
@@ -173,7 +174,7 @@ export function useSummarization({ url, apiKey, selectedPromptId }: UseSummariza
         setErrorMessage(ERROR_MESSAGES.API_ERROR ?? 'Failed to generate summary.');
       }
     }
-  }, [url, apiKey, selectedPromptId, bufferedMarkdown]);
+  }, [url, apiKey, selectedPromptId, modelOverride, bufferedMarkdown]);
 
   const handleStop = useCallback(() => {
     stopRef.current = true;

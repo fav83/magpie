@@ -14,6 +14,7 @@ import {
 import { PromptAccordionItem } from './PromptAccordionItem';
 import { ConfirmDialog } from './ConfirmDialog';
 import { PromptActionsProvider } from './PromptActionsContext';
+import { useFavoriteModels } from '../hooks/useFavoriteModels';
 import { BackButton } from './ui';
 
 interface ManagePromptsProps {
@@ -33,6 +34,7 @@ export function ManagePrompts({ onBack, apiKey }: ManagePromptsProps): React.JSX
   const [models, setModels] = useState<ModelInfo[] | null>(null);
   const [modelsError, setModelsError] = useState(false);
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
+  const { favoriteIds } = useFavoriteModels();
 
   const loadPrompts = useCallback(async () => {
     const loaded = await getPrompts();
@@ -126,6 +128,7 @@ export function ManagePrompts({ onBack, apiKey }: ManagePromptsProps): React.JSX
   const actions = useMemo(() => ({
     models,
     modelsError,
+    favoriteIds,
     onRetryModels: handleRetryModels,
     onSave: handleSave,
     onSetDefault: (id: string) => void handleSetDefault(id),
@@ -133,7 +136,7 @@ export function ManagePrompts({ onBack, apiKey }: ManagePromptsProps): React.JSX
     onDelete: handleDeleteRequest,
     onReset: handleResetRequest,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [models, modelsError, prompts]);
+  }), [models, modelsError, favoriteIds, prompts]);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

@@ -4,6 +4,7 @@ import type { ModelInfo } from '../services/modelService';
 export interface PromptActions {
   models: ModelInfo[] | null;
   modelsError: boolean;
+  favoriteIds: Set<string>;
   onRetryModels: () => void;
   onSave: (id: string, updates: { name: string; text: string; model: string }) => Promise<void>;
   onSetDefault: (id: string) => void;
