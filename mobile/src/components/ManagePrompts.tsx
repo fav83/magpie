@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Prompt } from '../types/prompt';
-import type { ModelInfo } from '../services/modelService';
-import { fetchModels, clearModelCache } from '../services/modelService';
 import {
   getPrompts,
   addPrompt,
@@ -15,6 +13,7 @@ import { PromptAccordionItem } from './PromptAccordionItem';
 import { ConfirmDialog } from './ConfirmDialog';
 import { PromptActionsProvider } from './PromptActionsContext';
 import { useFavoriteModels } from '../hooks/useFavoriteModels';
+import { useModels } from '../hooks/useModels';
 import { BackButton } from './ui';
 
 interface ManagePromptsProps {
@@ -31,39 +30,18 @@ export function ManagePrompts({ onBack, apiKey }: ManagePromptsProps): React.JSX
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [autoFocusId, setAutoFocusId] = useState<string | null>(null);
-  const [models, setModels] = useState<ModelInfo[] | null>(null);
-  const [modelsError, setModelsError] = useState(false);
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
   const { favoriteIds } = useFavoriteModels();
+  const { models, modelsError, retryModels: handleRetryModels } = useModels(apiKey);
 
   const loadPrompts = useCallback(async () => {
     const loaded = await getPrompts();
     setPrompts(loaded);
   }, []);
 
-  const loadModels = useCallback(async () => {
-    if (!apiKey) {
-      setModelsError(true);
-      return;
-    }
-    try {
-      setModelsError(false);
-      const result = await fetchModels(apiKey);
-      setModels(result);
-    } catch {
-      setModelsError(true);
-    }
-  }, [apiKey]);
-
   useEffect(() => {
     void loadPrompts();
-    void loadModels();
-  }, [loadPrompts, loadModels]);
-
-  const handleRetryModels = useCallback(() => {
-    clearModelCache();
-    void loadModels();
-  }, [loadModels]);
+  }, [loadPrompts]);
 
   const handleToggle = (id: string) => {
     setAutoFocusId(null);

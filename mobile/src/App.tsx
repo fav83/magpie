@@ -1,13 +1,12 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { loadApiKey } from './services/storage';
 import { shareSummary, copySummary } from './services/shareSummary';
-import { fetchModels } from './services/modelService';
-import type { ModelInfo } from './services/modelService';
 import { usePromptManager } from './hooks/usePromptManager';
 import { useSummarization } from './hooks/useSummarization';
 import { useShareIntent } from './hooks/useShareIntent';
 import { useFavoriteModels } from './hooks/useFavoriteModels';
 import { useFontScale } from './hooks/useFontScale';
+import { useModels } from './hooks/useModels';
 import { Settings } from './components/Settings';
 import { ManagePrompts } from './components/ManagePrompts';
 import { ManageFavoriteModels } from './components/ManageFavoriteModels';
@@ -35,11 +34,11 @@ export function App(): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState<Page>('main');
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [modelOverride, setModelOverride] = useState<string | null>(null);
-  const [models, setModels] = useState<ModelInfo[]>([]);
 
   const { prompts, selectedPromptId, setSelectedPromptId, loadPromptData } = usePromptManager();
   const { favoriteIds, reloadFavorites } = useFavoriteModels();
   const { fontScale, setFontScale } = useFontScale();
+  const { models } = useModels(apiKey);
 
   const summarization = useSummarization({ url, apiKey, selectedPromptId, modelOverride });
   const {
@@ -59,30 +58,21 @@ export function App(): React.JSX.Element {
   const handleSummarizeRef = useRef(handleSummarize);
   handleSummarizeRef.current = handleSummarize;
 
-  const resetRef = useRef(summarization.reset);
-  resetRef.current = summarization.reset;
-
-  const cancelRef = useRef(cancel);
-  cancelRef.current = cancel;
-
-  const resetMainScreen = useCallback(() => {
-    setCurrentPage('main');
-    resetRef.current();
-  }, []);
-
   // Auto-scroll state
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const userScrolledUpRef = useRef(false);
 
+  // useShareIntent wraps callbacks in refs internally, so closures stay fresh
   const { pendingShareUrl, consumePendingUrl } = useShareIntent({
     onYouTubeUrl: (shareUrl) => {
-      // Cancel active stream if any (share collision)
-      cancelRef.current();
-      resetMainScreen();
+      cancel();
+      setCurrentPage('main');
+      summarization.reset();
       setUrl(shareUrl);
     },
     onNoYouTube: () => {
-      resetMainScreen();
+      setCurrentPage('main');
+      summarization.reset();
       setErrorMessage('No YouTube URL found in shared content');
       setUrl('');
     },
@@ -93,13 +83,6 @@ export function App(): React.JSX.Element {
     void loadApiKey().then((key) => setApiKey(key));
     void loadPromptData();
   }, [loadPromptData]);
-
-  // Load models for display names (re-fetch on page change to recover from failed initial load)
-  useEffect(() => {
-    if (apiKey) {
-      void fetchModels(apiKey).then(setModels).catch(() => {});
-    }
-  }, [apiKey, currentPage]);
 
   // Reset model override when prompt changes
   useEffect(() => {
@@ -157,7 +140,7 @@ export function App(): React.JSX.Element {
   const effectiveModel = modelOverride ?? selectedPrompt?.model ?? '';
 
   const favoriteModels = useMemo(
-    () => models.filter((m) => favoriteIds.has(m.id)).sort((a, b) => a.name.localeCompare(b.name)),
+    () => (models ?? []).filter((m) => favoriteIds.has(m.id)).sort((a, b) => a.name.localeCompare(b.name)),
     [models, favoriteIds],
   );
 
@@ -259,7 +242,7 @@ export function App(): React.JSX.Element {
               {/* Always show current model if not already in favorites list */}
               {effectiveModel && !favoriteModels.some((m) => m.id === effectiveModel) && (
                 <option value={effectiveModel}>
-                  {models.find((m) => m.id === effectiveModel)?.name ?? effectiveModel}
+                  {models?.find((m) => m.id === effectiveModel)?.name ?? effectiveModel}
                 </option>
               )}
               {favoriteModels.map((m) => (

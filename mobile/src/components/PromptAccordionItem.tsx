@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { Prompt } from '../types/prompt';
-import { validatePromptName, validatePromptText } from '../services/promptStorage';
+import { validatePromptName, validatePromptText } from '../services/promptValidation';
 import { usePromptActions } from './PromptActionsContext';
 import { inputClass } from './ui';
 
@@ -177,60 +177,78 @@ export function PromptAccordionItem({
             {textError && <p className="text-xs text-red-600 mt-1">{textError}</p>}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void handleSave()}
-              disabled={!hasChanges || saving}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                !hasChanges || saving
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-
-            {!prompt.isDefault && (
-              <button
-                type="button"
-                onClick={() => onSetDefault(prompt.id)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-              >
-                Set Default
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => onDuplicate(prompt.id)}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-            >
-              Duplicate
-            </button>
-
-            {!prompt.isSystem && (
-              <button
-                type="button"
-                onClick={() => onDelete(prompt.id)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-              >
-                Delete
-              </button>
-            )}
-
-            {prompt.isBuiltIn && prompt.isModified && (
-              <button
-                type="button"
-                onClick={() => onReset(prompt.id)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
-              >
-                Reset to original
-              </button>
-            )}
-          </div>
+          <PromptActionButtons
+            prompt={prompt}
+            hasChanges={hasChanges}
+            saving={saving}
+            onSave={() => void handleSave()}
+            onSetDefault={() => onSetDefault(prompt.id)}
+            onDuplicate={() => onDuplicate(prompt.id)}
+            onDelete={() => onDelete(prompt.id)}
+            onReset={() => onReset(prompt.id)}
+          />
         </div>
+      )}
+    </div>
+  );
+}
+
+const actionBtnClass = 'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors';
+
+function PromptActionButtons({
+  prompt,
+  hasChanges,
+  saving,
+  onSave,
+  onSetDefault,
+  onDuplicate,
+  onDelete,
+  onReset,
+}: {
+  prompt: Prompt;
+  hasChanges: boolean;
+  saving: boolean;
+  onSave: () => void;
+  onSetDefault: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onReset: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={!hasChanges || saving}
+        className={`${actionBtnClass} ${
+          !hasChanges || saving
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            : 'bg-blue-600 text-white hover:bg-blue-700'
+        }`}
+      >
+        {saving ? 'Saving...' : 'Save'}
+      </button>
+
+      {!prompt.isDefault && (
+        <button type="button" onClick={onSetDefault} className={`${actionBtnClass} bg-gray-100 text-gray-700 hover:bg-gray-200`}>
+          Set Default
+        </button>
+      )}
+
+      <button type="button" onClick={onDuplicate} className={`${actionBtnClass} bg-gray-100 text-gray-700 hover:bg-gray-200`}>
+        Duplicate
+      </button>
+
+      {!prompt.isSystem && (
+        <button type="button" onClick={onDelete} className={`${actionBtnClass} bg-red-50 text-red-600 hover:bg-red-100`}>
+          Delete
+        </button>
+      )}
+
+      {prompt.isBuiltIn && prompt.isModified && (
+        <button type="button" onClick={onReset} className={`${actionBtnClass} bg-amber-50 text-amber-700 hover:bg-amber-100`}>
+          Reset to original
+        </button>
       )}
     </div>
   );

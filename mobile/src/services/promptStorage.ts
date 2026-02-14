@@ -1,5 +1,5 @@
 import { Preferences } from '@capacitor/preferences';
-import type { Prompt, ValidationResult } from '../types/prompt';
+import type { Prompt } from '../types/prompt';
 export type { ValidationResult } from '../types/prompt';
 import { SYSTEM_PROMPT_ID } from '../types/prompt';
 import { config } from '../config';
@@ -262,16 +262,4 @@ export async function resetBuiltInPrompt(id: string): Promise<void> {
   await savePrompts(prompts);
 }
 
-export function validatePromptText(text: string): ValidationResult {
-  if (!text.includes('{{transcript}}')) {
-    return { valid: false, error: 'Prompt must include {{transcript}} placeholder.' };
-  }
-  return { valid: true };
-}
-
-export function validatePromptName(name: string): ValidationResult {
-  if (!name.trim()) {
-    return { valid: false, error: 'Prompt name cannot be empty.' };
-  }
-  return { valid: true };
-}
+export { validatePromptText, validatePromptName } from './promptValidation';

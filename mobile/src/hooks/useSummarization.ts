@@ -3,6 +3,7 @@ import { isValidYouTubeUrl, extractVideoId } from '../utils/youtube';
 import { fetchTranscript } from '../services/transcript';
 import { streamSummary } from '../services/streamingOpenrouter';
 import { getPromptById } from '../services/promptStorage';
+import { getErrorMessage } from '../services/errorMessages';
 import { useBufferedMarkdown } from './useBufferedMarkdown';
 import { config } from '../config';
 
@@ -14,17 +15,6 @@ export interface SummaryResult {
 }
 
 export type SummarizationState = 'idle' | 'fetching-transcript' | 'streaming' | 'done' | 'error';
-
-const ERROR_MESSAGES: Record<string, string> = {
-  INVALID_URL: 'Please enter a valid YouTube video URL',
-  NO_CAPTIONS: 'No transcript available for this video',
-  CONTEXT_TOO_LONG: 'This video is too long for the current model. Try a shorter video.',
-  EXTRACTION_FAILED: 'Failed to extract transcript. Please try again.',
-  API_ERROR: 'Failed to generate summary. Please try again.',
-  NETWORK_ERROR: 'No internet connection. Please check your network.',
-  INVALID_API_KEY: 'Failed to generate summary. Please try again.',
-  RATE_LIMITED: 'Rate limited. Please try again later.',
-};
 
 function validateUrl(url: string): string | null {
   const trimmed = url.trim();
@@ -68,7 +58,7 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
 
     const videoId = validateUrl((urlOverride ?? url).trim());
     if (!videoId) {
-      setErrorMessage(ERROR_MESSAGES.INVALID_URL ?? 'Invalid URL');
+      setErrorMessage(getErrorMessage('INVALID_URL'));
       return;
     }
 
@@ -99,13 +89,13 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
     if (!transcriptResult.success) {
       if (controller.signal.aborted) return;
       setState('error');
-      setErrorMessage(ERROR_MESSAGES[transcriptResult.error] ?? 'Failed to extract transcript.');
+      setErrorMessage(getErrorMessage(transcriptResult.error, 'Failed to extract transcript.'));
       return;
     }
 
     if (transcriptResult.data.transcript.length > config.maxTranscriptChars) {
       setState('error');
-      setErrorMessage(ERROR_MESSAGES.CONTEXT_TOO_LONG ?? 'Transcript too long');
+      setErrorMessage(getErrorMessage('CONTEXT_TOO_LONG'));
       return;
     }
 
@@ -137,7 +127,7 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
               setSummaryResult(makeSummaryResult(partialContent));
             }
             setState('error');
-            const baseMessage = ERROR_MESSAGES[error] ?? 'Failed to generate summary.';
+            const baseMessage = getErrorMessage(error, 'Failed to generate summary.');
             setErrorMessage(errorDetails ? `${baseMessage} (${errorDetails})` : baseMessage);
           },
         },
@@ -165,7 +155,7 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
       if (!controller.signal.aborted) {
         bufferedMarkdown.flush();
         setState('error');
-        setErrorMessage(ERROR_MESSAGES.API_ERROR ?? 'Failed to generate summary.');
+        setErrorMessage(getErrorMessage('API_ERROR'));
       }
     }
   }, [url, apiKey, selectedPromptId, modelOverride, bufferedMarkdown]);

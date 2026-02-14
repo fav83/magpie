@@ -1,7 +1,8 @@
 import { config, openRouterHeaders } from '../config';
 import { logError } from '../utils/logger';
 import { parseSSEStream } from './sseParser';
-import type { SummaryError } from './openrouter';
+
+export type SummaryError = 'INVALID_API_KEY' | 'RATE_LIMITED' | 'API_ERROR' | 'NETWORK_ERROR';
 
 export interface StreamCallbacks {
   onChunk: (content: string) => void;

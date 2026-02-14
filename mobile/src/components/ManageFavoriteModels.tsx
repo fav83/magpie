@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { ModelInfo } from '../services/modelService';
-import { fetchModels, clearModelCache, isFreeModel, formatPricingDisplay } from '../services/modelService';
+import { isFreeModel, formatPricingDisplay } from '../services/modelService';
 import { useFavoriteModels } from '../hooks/useFavoriteModels';
+import { useModels } from '../hooks/useModels';
 import { Spinner, BackButton, inputClass } from './ui';
 
 interface ManageFavoriteModelsProps {
@@ -10,49 +11,20 @@ interface ManageFavoriteModelsProps {
 }
 
 export function ManageFavoriteModels({ onBack, apiKey }: ManageFavoriteModelsProps): React.JSX.Element {
-  const [models, setModels] = useState<ModelInfo[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
   const [search, setSearch] = useState('');
   const [freeOnly, setFreeOnly] = useState(false);
   const { favoriteIds, toggleFavorite } = useFavoriteModels();
+  const { models, modelsError: error, retryModels: handleRetry } = useModels(apiKey);
   const listRef = useRef<HTMLDivElement>(null);
+  const loading = models === null && !error;
 
   const handleToggle = useCallback(async (modelId: string) => {
     const wasFavorite = favoriteIds.has(modelId);
     await toggleFavorite(modelId);
-    // Scroll to top when adding a favorite so the user sees it
     if (!wasFavorite && listRef.current) {
       listRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [favoriteIds, toggleFavorite]);
-
-  const loadModels = useCallback(async () => {
-    if (!apiKey) {
-      setError(true);
-      setLoading(false);
-      return;
-    }
-    try {
-      setError(false);
-      setLoading(true);
-      const result = await fetchModels(apiKey);
-      setModels(result);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [apiKey]);
-
-  useEffect(() => {
-    void loadModels();
-  }, [loadModels]);
-
-  const handleRetry = () => {
-    clearModelCache();
-    void loadModels();
-  };
 
   const filtered = models?.filter((m) => {
     const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
