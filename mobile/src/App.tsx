@@ -7,6 +7,7 @@ import { usePromptManager } from './hooks/usePromptManager';
 import { useSummarization } from './hooks/useSummarization';
 import { useShareIntent } from './hooks/useShareIntent';
 import { useFavoriteModels } from './hooks/useFavoriteModels';
+import { useFontScale } from './hooks/useFontScale';
 import { Settings } from './components/Settings';
 import { ManagePrompts } from './components/ManagePrompts';
 import { ManageFavoriteModels } from './components/ManageFavoriteModels';
@@ -38,6 +39,7 @@ export function App(): React.JSX.Element {
 
   const { prompts, selectedPromptId, setSelectedPromptId, loadPromptData } = usePromptManager();
   const { favoriteIds, reloadFavorites } = useFavoriteModels();
+  const { fontScale, setFontScale } = useFontScale();
 
   const summarization = useSummarization({ url, apiKey, selectedPromptId, modelOverride });
   const {
@@ -92,12 +94,12 @@ export function App(): React.JSX.Element {
     void loadPromptData();
   }, [loadPromptData]);
 
-  // Load models for display names
+  // Load models for display names (re-fetch on page change to recover from failed initial load)
   useEffect(() => {
     if (apiKey) {
       void fetchModels(apiKey).then(setModels).catch(() => {});
     }
-  }, [apiKey]);
+  }, [apiKey, currentPage]);
 
   // Reset model override when prompt changes
   useEffect(() => {
@@ -196,6 +198,8 @@ export function App(): React.JSX.Element {
         onKeySaved={(key) => setApiKey(key)}
         onManageFavoriteModels={() => setCurrentPage('manage-favorite-models')}
         onManagePrompts={() => setCurrentPage('manage-prompts')}
+        fontScale={fontScale}
+        onFontScaleChange={setFontScale}
       />
     );
   }

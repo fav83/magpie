@@ -55,9 +55,11 @@ interface SettingsProps {
   onKeySaved: (key: string) => void;
   onManageFavoriteModels: () => void;
   onManagePrompts: () => void;
+  fontScale: number;
+  onFontScaleChange: (scale: number) => void;
 }
 
-export function Settings({ onBack, onKeySaved, onManageFavoriteModels, onManagePrompts }: SettingsProps): React.JSX.Element {
+export function Settings({ onBack, onKeySaved, onManageFavoriteModels, onManagePrompts, fontScale, onFontScaleChange }: SettingsProps): React.JSX.Element {
   const [inputValue, setInputValue] = useState('');
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [form, dispatch] = useReducer(settingsReducer, { phase: 'idle', statusMessage: '', statusType: 'info' });
@@ -210,6 +212,36 @@ export function Settings({ onBack, onKeySaved, onManageFavoriteModels, onManageP
             <span>{form.statusMessage}</span>
           </div>
         )}
+
+        {/* Font Size */}
+        <div className="pt-4 border-t border-gray-200">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Font Size</label>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 w-8 text-right">50%</span>
+            <input
+              type="range"
+              min={50}
+              max={200}
+              step={10}
+              value={fontScale}
+              onChange={(e) => onFontScaleChange(Number(e.target.value))}
+              className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+            <span className="text-xs text-gray-500 w-8">200%</span>
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <span className="text-sm text-gray-600">{fontScale}%</span>
+            {fontScale !== 100 && (
+              <button
+                type="button"
+                onClick={() => onFontScaleChange(100)}
+                className="text-xs text-blue-600 hover:text-blue-700"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Manage Favorite Models */}
         <div className="pt-4 border-t border-gray-200">
