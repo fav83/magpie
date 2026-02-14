@@ -322,6 +322,22 @@ When summarization or chat is streaming (10-60+ seconds):
 - **Waiting for transitions:** After navigation, wait 500ms then dump the UI tree to confirm the new screen loaded
 - **Chat testing:** Keep chat questions short and specific (e.g., "Main topic?" or "What is time?"). Avoid asking for long-form content like essays, as the responses can push the chat header Copy all/Clear buttons beyond scrollable reach.
 
+### No Bug Fixing During Test Runs
+
+**Claude must NEVER fix bugs found during a test run.** If a test fails because of a bug in the app code (e.g., a disabled handler, broken component, missing implementation), Claude must:
+
+1. Mark the test as **FAIL** with diagnostic details (what was expected, what was found)
+2. Capture a screenshot and UI tree dump as evidence
+3. Continue to the next scenario
+
+Claude must NOT:
+- Edit source code to fix the bug
+- Rebuild or redeploy the app mid-run
+- Work around broken functionality to force a pass
+- Restore gutted/disabled implementations
+
+The purpose of E2E testing is to **detect** bugs, not fix them. Bugs found during a test run should be documented in the test report's Failures section so they can be addressed separately after the run completes.
+
 ### Progress Reporting
 
 Before each scenario, Claude must output a progress line to the user:
@@ -879,12 +895,15 @@ Scenario T-48: Free model filter
 
 ## Failure Handling
 
+**Important: Never fix bugs during a test run.** See [No Bug Fixing During Test Runs](#no-bug-fixing-during-test-runs) in Execution Guidelines.
+
 When a test scenario fails:
 
 1. **Capture evidence:**
    - Take a screenshot of the current screen state
    - Dump the UI tree via `$ADB shell "uiautomator dump ..." | parse_ui`
    - Note the specific assertion that failed
+   - If the failure is due to a code bug (e.g., broken handler, disabled feature), note the root cause
 
 2. **Log the failure** in the test report with:
    - Scenario name
@@ -892,12 +911,14 @@ When a test scenario fails:
    - Expected vs actual result
    - Screenshot file path
    - Accessibility tree excerpt (relevant elements only)
+   - Root cause if identifiable (e.g., "handleSend function was gutted in ChatInput.tsx")
 
-3. **Continue to the next scenario.** Do not halt the entire test run.
+3. **Continue to the next scenario.** Do not halt the entire test run. Do not fix the bug.
 
 4. **State recovery:** If the failure leaves the app in a broken state (crashed, stuck on wrong screen):
    - Force-stop and relaunch the app: `$ADB shell am force-stop com.magpie.app && $ADB shell am start -n com.magpie.app/.MainActivity`
    - If the test that failed was in the API key setup group, re-enter the API key before continuing
+   - If a bug makes multiple subsequent scenarios impossible (e.g., chat send is broken), mark all affected scenarios as FAIL with a note referencing the original failure, then skip to the next unaffected feature group
 
 ---
 
