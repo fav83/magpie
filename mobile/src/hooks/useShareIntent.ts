@@ -14,10 +14,16 @@ export function useShareIntent({ onYouTubeUrl, onNoYouTube }: UseShareIntentPara
   onYouTubeUrlRef.current = onYouTubeUrl;
   onNoYouTubeRef.current = onNoYouTube;
 
+  // Track last processed intent URL to avoid re-processing on app resume
+  const lastProcessedUrlRef = useRef<string | null>(null);
+
   useEffect(() => {
     const processIntent = async (retryOnNone = true) => {
       const result = await checkShareIntent();
       if (result.kind === 'youtube') {
+        // Skip if this is the same URL we already processed (e.g. app resume)
+        if (result.url === lastProcessedUrlRef.current) return;
+        lastProcessedUrlRef.current = result.url;
         onYouTubeUrlRef.current(result.url);
         setPendingShareUrl(result.url);
       } else if (result.kind === 'no-youtube') {
