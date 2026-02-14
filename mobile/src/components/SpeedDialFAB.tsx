@@ -6,6 +6,7 @@ interface SpeedDialFABProps {
   visible: boolean;
   onShare: () => void;
   onCopy: () => void;
+  onShareWithChat?: (() => void) | undefined;
 }
 
 interface SpeedDialItemProps {
@@ -34,7 +35,7 @@ function SpeedDialItem({ label, ariaLabel, open, onClick, delay, icon }: SpeedDi
       </span>
       <button
         onClick={onClick}
-        className="h-10 w-10 rounded-full bg-white text-gray-700 shadow-md flex items-center justify-center hover:bg-gray-50"
+        className="h-10 w-10 rounded-full bg-white text-gray-700 shadow-md flex items-center justify-center hover:bg-gray-50 pointer-events-auto"
         aria-label={ariaLabel}
       >
         {icon}
@@ -49,7 +50,7 @@ const ShareIcon = ({ className }: { className: string }) => (
   </svg>
 );
 
-export function SpeedDialFAB({ visible, onShare, onCopy }: SpeedDialFABProps): React.JSX.Element {
+export function SpeedDialFAB({ visible, onShare, onCopy, onShareWithChat }: SpeedDialFABProps): React.JSX.Element {
   const [fabOpen, setFabOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,6 +77,11 @@ export function SpeedDialFAB({ visible, onShare, onCopy }: SpeedDialFABProps): R
   const handleShare = () => {
     setFabOpen(false);
     onShare();
+  };
+
+  const handleShareWithChat = () => {
+    setFabOpen(false);
+    onShareWithChat?.();
   };
 
   const handleCopy = () => {
@@ -111,10 +117,24 @@ export function SpeedDialFAB({ visible, onShare, onCopy }: SpeedDialFABProps): R
         aria-hidden="true"
       />
 
-      {/* Speed dial container */}
-      <div className="fixed bottom-3 right-0" style={{ zIndex: 50 }}>
+      {/* Speed dial container — pointer-events-none so it doesn't block content behind it */}
+      <div className="fixed bottom-3 right-0 pointer-events-none" style={{ zIndex: 50 }}>
         {/* Speed dial items */}
         <div className="flex flex-col items-end gap-3 mb-3">
+          {onShareWithChat && (
+            <SpeedDialItem
+              label="Share with chat"
+              ariaLabel="Share summary and chat"
+              open={fabOpen}
+              onClick={handleShareWithChat}
+              delay="100ms"
+              icon={
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              }
+            />
+          )}
           <SpeedDialItem
             label="Copy"
             ariaLabel="Copy summary"
@@ -135,7 +155,7 @@ export function SpeedDialFAB({ visible, onShare, onCopy }: SpeedDialFABProps): R
         {/* Main FAB */}
         <button
           onClick={() => setFabOpen((prev) => !prev)}
-          className={`h-14 w-14 rounded-full bg-blue-600 text-white shadow-lg flex items-center justify-center transition-transform duration-200 ease-out ${
+          className={`h-14 w-14 rounded-full bg-blue-600 text-white shadow-lg flex items-center justify-center transition-transform duration-200 ease-out pointer-events-auto ${
             visible ? 'scale-100' : 'scale-0'
           }`}
           aria-label={fabOpen ? 'Close share menu' : 'Share summary'}

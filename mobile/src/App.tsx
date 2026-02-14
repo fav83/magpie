@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { loadApiKey } from './services/storage';
-import { shareSummary, copySummary } from './services/shareSummary';
+import { shareSummary, copySummary, shareWithChat } from './services/shareSummary';
 import { usePromptManager } from './hooks/usePromptManager';
 import { useSummarization } from './hooks/useSummarization';
 import { useShareIntent } from './hooks/useShareIntent';
@@ -13,8 +13,10 @@ import { ManageFavoriteModels } from './components/ManageFavoriteModels';
 import { LoadingIndicator } from './components/LoadingIndicator';
 import { ErrorBanner } from './components/ErrorBanner';
 import { SummaryView } from './components/SummaryView';
-import { SpeedDialFAB } from './components/SpeedDialFAB';
+import { ShareMenu } from './components/ShareMenu';
 import { Spinner, inputClass } from './components/ui';
+import { ChatSection } from './components/chat/ChatSection';
+import { useVideoChat } from './hooks/useVideoChat';
 
 type Page = 'main' | 'settings' | 'manage-prompts' | 'manage-favorite-models';
 
@@ -40,6 +42,13 @@ export function App(): React.JSX.Element {
   const { fontScale, setFontScale } = useFontScale();
   const { models } = useModels(apiKey);
 
+  const selectedPrompt = useMemo(
+    () => prompts.find((p) => p.id === selectedPromptId),
+    [prompts, selectedPromptId],
+  );
+
+  const effectiveModel = modelOverride ?? selectedPrompt?.model ?? '';
+
   const summarization = useSummarization({ url, apiKey, selectedPromptId, modelOverride });
   const {
     state,
@@ -53,6 +62,13 @@ export function App(): React.JSX.Element {
     handleStop,
     cancel,
   } = summarization;
+
+  const chat = useVideoChat({
+    apiKey,
+    model: effectiveModel,
+    summary: summaryResult?.summary ?? '',
+    transcript: summaryResult?.transcript ?? '',
+  });
 
   // Keep a stable ref to handleSummarize for share intent auto-trigger
   const handleSummarizeRef = useRef(handleSummarize);
@@ -68,11 +84,13 @@ export function App(): React.JSX.Element {
       cancel();
       setCurrentPage('main');
       summarization.reset();
+      chat.reset();
       setUrl(shareUrl);
     },
     onNoYouTube: () => {
       setCurrentPage('main');
       summarization.reset();
+      chat.reset();
       setErrorMessage('No YouTube URL found in shared content');
       setUrl('');
     },
@@ -113,9 +131,11 @@ export function App(): React.JSX.Element {
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Auto-scroll on new streaming content
+  // Auto-scroll on new streaming content (summary or chat)
   useEffect(() => {
-    if (state === 'streaming' && displayContent && !userScrolledUpRef.current) {
+    const isSummaryStreaming = state === 'streaming' && displayContent;
+    const isChatStreaming = chat.isStreaming && chat.streamingDisplayContent;
+    if ((isSummaryStreaming || isChatStreaming) && !userScrolledUpRef.current) {
       const container = scrollContainerRef.current;
       if (container) {
         requestAnimationFrame(() => {
@@ -123,32 +143,27 @@ export function App(): React.JSX.Element {
         });
       }
     }
-  }, [displayContent, state]);
+  }, [displayContent, state, chat.isStreaming, chat.streamingDisplayContent]);
 
-  // Reset scroll tracking on new summarization
+  // Reset scroll tracking and chat on new summarization
   useEffect(() => {
     if (state === 'fetching-transcript') {
       userScrolledUpRef.current = false;
+      chat.reset();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only trigger on state change
   }, [state]);
-
-  const selectedPrompt = useMemo(
-    () => prompts.find((p) => p.id === selectedPromptId),
-    [prompts, selectedPromptId],
-  );
-
-  const effectiveModel = modelOverride ?? selectedPrompt?.model ?? '';
 
   const favoriteModels = useMemo(
     () => (models ?? []).filter((m) => favoriteIds.has(m.id)).sort((a, b) => a.name.localeCompare(b.name)),
     [models, favoriteIds],
   );
 
-  const isStreaming = state === 'streaming';
+  const isSummaryStreaming = state === 'streaming';
   const isFetchingTranscript = state === 'fetching-transcript';
-  const isLoading = isFetchingTranscript || (isStreaming && !hasReceivedFirstChunk);
-  const showStopBar = isStreaming && hasReceivedFirstChunk;
-  const showFAB = state === 'done' && summaryResult !== null;
+  const isLoading = isFetchingTranscript || (isSummaryStreaming && !hasReceivedFirstChunk);
+  const showStopBar = (isSummaryStreaming && hasReceivedFirstChunk) || chat.isStreaming;
+  const hasSummary = state === 'done' && summaryResult !== null;
 
   if (currentPage === 'manage-favorite-models') {
     return (
@@ -195,18 +210,31 @@ export function App(): React.JSX.Element {
           <MagpieLogo />
           <h1 className="text-lg font-semibold text-gray-800">Magpie</h1>
         </div>
-        <button onClick={() => setCurrentPage('settings')} className="text-gray-500" aria-label="Settings">
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-3">
+          {hasSummary && (
+            <ShareMenu
+              onCopy={() => { if (summaryResult) void copySummary(summaryResult); }}
+              onShare={() => { if (summaryResult) void shareSummary(summaryResult); }}
+              onShareWithChat={
+                chat.messages.length > 0 && summaryResult
+                  ? () => void shareWithChat(summaryResult, chat.messages)
+                  : undefined
+              }
+            />
+          )}
+          <button onClick={() => setCurrentPage('settings')} className="text-gray-500 p-1" aria-label="Settings">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       {/* Scrollable content: input area + summary */}
       <div
         ref={scrollContainerRef}
-        className={`flex-1 overflow-y-auto ${showStopBar ? 'pb-16' : showFAB ? 'pb-24' : ''}`}
+        className={`flex-1 overflow-y-auto ${showStopBar ? 'pb-16' : ''}`}
       >
         {/* Input area */}
         <div className="px-4 pt-4 pb-2 space-y-3">
@@ -224,7 +252,7 @@ export function App(): React.JSX.Element {
             <select
               value={selectedPromptId ?? ''}
               onChange={(e) => setSelectedPromptId(e.target.value)}
-              disabled={isFetchingTranscript || isStreaming}
+              disabled={isFetchingTranscript || isSummaryStreaming}
               className={`flex-1 min-w-0 bg-white ${inputClass}`}
             >
               {prompts.map((p) => (
@@ -236,7 +264,7 @@ export function App(): React.JSX.Element {
             <select
               value={effectiveModel}
               onChange={(e) => setModelOverride(e.target.value)}
-              disabled={isFetchingTranscript || isStreaming}
+              disabled={isFetchingTranscript || isSummaryStreaming}
               className={`flex-1 min-w-0 bg-white ${inputClass}`}
             >
               {/* Always show current model if not already in favorites list */}
@@ -256,7 +284,7 @@ export function App(): React.JSX.Element {
           </div>
 
           {/* Action button: Summarize / Fetching / Stop */}
-          {isStreaming ? (
+          {isSummaryStreaming ? (
             <button
               type="button"
               onClick={handleStop}
@@ -297,7 +325,7 @@ export function App(): React.JSX.Element {
         {isLoading && <LoadingIndicator state="fetching-transcript" />}
 
         {/* Streaming content */}
-        {isStreaming && hasReceivedFirstChunk && (
+        {isSummaryStreaming && hasReceivedFirstChunk && (
           <SummaryView summary={displayContent} isStreaming />
         )}
 
@@ -307,7 +335,7 @@ export function App(): React.JSX.Element {
         )}
 
         {/* Error banner — show for both validation errors (idle state) and runtime errors */}
-        {errorMessage && !isLoading && !isStreaming && (
+        {errorMessage && !isLoading && !isSummaryStreaming && (
           <ErrorBanner
             message={errorMessage}
             onGoToSettings={noKeyError ? () => setCurrentPage('settings') : undefined}
@@ -317,6 +345,20 @@ export function App(): React.JSX.Element {
 
         {/* Completed summary */}
         {state === 'done' && summaryResult && <SummaryView summary={summaryResult.summary} />}
+
+        {/* Chat section — available after summary completes */}
+        {state === 'done' && summaryResult && (
+          <ChatSection
+            messages={chat.messages}
+            isExpanded={chat.isExpanded}
+            isStreaming={chat.isStreaming}
+            streamingDisplayContent={chat.streamingDisplayContent}
+            onSend={chat.sendMessage}
+            onToggleExpanded={chat.toggleExpanded}
+            onCancelStreaming={chat.cancelStreaming}
+            onClear={chat.clearChat}
+          />
+        )}
         </div>
       </div>
 
@@ -325,7 +367,7 @@ export function App(): React.JSX.Element {
         <div className="fixed bottom-6 left-0 right-0 flex justify-center z-10 pointer-events-none">
           <button
             type="button"
-            onClick={handleStop}
+            onClick={chat.isStreaming ? chat.cancelStreaming : handleStop}
             className="pointer-events-auto flex items-center gap-2 px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-full shadow-lg hover:bg-gray-700 transition-colors"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -336,11 +378,6 @@ export function App(): React.JSX.Element {
         </div>
       )}
 
-      <SpeedDialFAB
-        visible={state === 'done' && summaryResult !== null}
-        onShare={() => { if (summaryResult) void shareSummary(summaryResult); }}
-        onCopy={() => { if (summaryResult) void copySummary(summaryResult); }}
-      />
     </div>
   );
 }

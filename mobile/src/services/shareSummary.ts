@@ -1,5 +1,6 @@
 import { Share } from '@capacitor/share';
 import { logError } from '../utils/logger';
+import type { ChatMessage } from '../types/chat';
 
 export interface ShareContent {
   title: string;
@@ -10,6 +11,16 @@ export interface ShareContent {
 
 export function formatShareText(content: ShareContent): string {
   return `**Title:** ${content.title}\n**URL:** ${content.url}\n**Model:** ${content.model}\n\n${content.summary}`;
+}
+
+function formatChatMessages(messages: ChatMessage[]): string {
+  return messages
+    .map((m) => `**${m.role === 'user' ? 'You' : 'Assistant'}:** ${m.content}`)
+    .join('\n\n');
+}
+
+export function formatShareWithChatText(content: ShareContent, messages: ChatMessage[]): string {
+  return `${formatShareText(content)}\n\n---\n\n**Chat:**\n\n${formatChatMessages(messages)}`;
 }
 
 export async function shareSummary(content: ShareContent): Promise<void> {
@@ -31,5 +42,17 @@ export async function copySummary(content: ShareContent): Promise<boolean> {
   } catch (error) {
     logError('shareSummary:copy', error);
     return false;
+  }
+}
+
+export async function shareWithChat(content: ShareContent, messages: ChatMessage[]): Promise<void> {
+  try {
+    await Share.share({
+      title: content.title,
+      text: formatShareWithChatText(content, messages),
+      dialogTitle: 'Share Summary & Chat',
+    });
+  } catch (error) {
+    logError('shareSummary:shareWithChat', error);
   }
 }

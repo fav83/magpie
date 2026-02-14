@@ -12,6 +12,7 @@ export interface SummaryResult {
   title: string;
   url: string;
   model: string;
+  transcript: string;
 }
 
 export type SummarizationState = 'idle' | 'fetching-transcript' | 'streaming' | 'done' | 'error';
@@ -37,7 +38,7 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
   const [hasReceivedFirstChunk, setHasReceivedFirstChunk] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const stopRef = useRef(false);
-  const contextRef = useRef({ title: '', url: '', model: '' });
+  const contextRef = useRef({ title: '', url: '', model: '', transcript: '' });
 
   const bufferedMarkdown = useBufferedMarkdown();
 
@@ -46,6 +47,7 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
     title: contextRef.current.title,
     url: contextRef.current.url,
     model: contextRef.current.model,
+    transcript: contextRef.current.transcript,
   });
 
   const handleSummarize = useCallback(async (urlOverride?: string) => {
@@ -100,6 +102,7 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
     }
 
     contextRef.current.title = transcriptResult.data.title;
+    contextRef.current.transcript = transcriptResult.data.transcript;
 
     // Phase 2: Stream summary
     setState('streaming');
