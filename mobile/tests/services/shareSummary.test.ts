@@ -27,20 +27,21 @@ const content: ShareContent = {
   title: 'My Video Title',
   summary: '## Summary\n\n- Point one\n- Point two',
   url: 'https://www.youtube.com/watch?v=abc123',
+  model: 'openai/gpt-4o-mini',
 };
 
 describe('formatShareText', () => {
-  it('formats title + summary + URL with double newline separators', () => {
+  it('formats title, URL, model, then summary', () => {
     const result = formatShareText(content);
     expect(result).toBe(
-      'My Video Title\n\n## Summary\n\n- Point one\n- Point two\n\nhttps://www.youtube.com/watch?v=abc123'
+      '**Title:** My Video Title\n**URL:** https://www.youtube.com/watch?v=abc123\n**Model:** openai/gpt-4o-mini\n\n## Summary\n\n- Point one\n- Point two'
     );
   });
 
   it('handles empty title gracefully', () => {
     const result = formatShareText({ ...content, title: '' });
     expect(result).toBe(
-      '\n\n## Summary\n\n- Point one\n- Point two\n\nhttps://www.youtube.com/watch?v=abc123'
+      '**Title:** \n**URL:** https://www.youtube.com/watch?v=abc123\n**Model:** openai/gpt-4o-mini\n\n## Summary\n\n- Point one\n- Point two'
     );
   });
 
@@ -49,6 +50,7 @@ describe('formatShareText', () => {
       title: 'Title',
       summary: '**bold** and _italic_ and `code`',
       url: 'https://youtu.be/xyz',
+      model: 'google/gemini-2.0-flash-001',
     };
     const result = formatShareText(mdContent);
     expect(result).toContain('**bold** and _italic_ and `code`');
@@ -63,8 +65,7 @@ describe('shareSummary', () => {
 
     expect(mockShare).toHaveBeenCalledWith({
       title: 'My Video Title',
-      text: '## Summary\n\n- Point one\n- Point two',
-      url: 'https://www.youtube.com/watch?v=abc123',
+      text: formatShareText(content),
       dialogTitle: 'Share Summary',
     });
   });

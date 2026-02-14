@@ -60,39 +60,42 @@ export function ManagePrompts({ onBack, apiKey }: ManagePromptsProps): React.JSX
     void loadModels();
   }, [loadPrompts, loadModels]);
 
-  const handleRetryModels = () => {
+  const handleRetryModels = useCallback(() => {
     clearModelCache();
     void loadModels();
-  };
+  }, [loadModels]);
 
   const handleToggle = (id: string) => {
     setAutoFocusId(null);
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
-  const handleSave = async (id: string, updates: { name: string; text: string; model: string }) => {
+  const handleSave = useCallback(async (id: string, updates: { name: string; text: string; model: string }) => {
     await updatePrompt(id, updates);
     await loadPrompts();
-  };
+  }, [loadPrompts]);
 
-  const handleSetDefault = async (id: string) => {
+  const handleSetDefault = useCallback(async (id: string) => {
     await setDefaultPromptId(id);
     await loadPrompts();
-  };
+  }, [loadPrompts]);
 
-  const handleDuplicate = async (id: string) => {
+  const handleDuplicate = useCallback(async (id: string) => {
     const newPrompt = await duplicatePrompt(id);
     await loadPrompts();
     setExpandedId(newPrompt.id);
     setAutoFocusId(newPrompt.id);
-  };
+  }, [loadPrompts]);
 
-  const handleDeleteRequest = (id: string) => {
-    const prompt = prompts.find((p) => p.id === id);
-    if (prompt) {
-      setDialog({ type: 'delete', promptId: id, promptName: prompt.name });
-    }
-  };
+  const handleDeleteRequest = useCallback((id: string) => {
+    setPrompts((current) => {
+      const prompt = current.find((p) => p.id === id);
+      if (prompt) {
+        setDialog({ type: 'delete', promptId: id, promptName: prompt.name });
+      }
+      return current;
+    });
+  }, []);
 
   const handleDeleteConfirm = async () => {
     if (dialog.type !== 'delete') return;
@@ -104,12 +107,15 @@ export function ManagePrompts({ onBack, apiKey }: ManagePromptsProps): React.JSX
     await loadPrompts();
   };
 
-  const handleResetRequest = (id: string) => {
-    const prompt = prompts.find((p) => p.id === id);
-    if (prompt) {
-      setDialog({ type: 'reset', promptId: id, promptName: prompt.name });
-    }
-  };
+  const handleResetRequest = useCallback((id: string) => {
+    setPrompts((current) => {
+      const prompt = current.find((p) => p.id === id);
+      if (prompt) {
+        setDialog({ type: 'reset', promptId: id, promptName: prompt.name });
+      }
+      return current;
+    });
+  }, []);
 
   const handleResetConfirm = async () => {
     if (dialog.type !== 'reset') return;
@@ -135,8 +141,7 @@ export function ManagePrompts({ onBack, apiKey }: ManagePromptsProps): React.JSX
     onDuplicate: (id: string) => void handleDuplicate(id),
     onDelete: handleDeleteRequest,
     onReset: handleResetRequest,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [models, modelsError, favoriteIds, prompts]);
+  }), [models, modelsError, favoriteIds, handleRetryModels, handleSave, handleSetDefault, handleDuplicate, handleDeleteRequest, handleResetRequest]);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

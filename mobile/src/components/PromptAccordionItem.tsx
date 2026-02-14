@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import type { Prompt } from '../types/prompt';
 import { validatePromptName, validatePromptText } from '../services/promptStorage';
 import { usePromptActions } from './PromptActionsContext';
+import { inputClass } from './ui';
 
 interface PromptAccordionItemProps {
   prompt: Prompt;
@@ -41,6 +42,14 @@ export function PromptAccordionItem({
   }, [isExpanded, autoFocusName]);
 
   const hasChanges = name !== prompt.name || text !== prompt.text || model !== prompt.model;
+
+  const { favModels, otherModels } = useMemo(() => {
+    if (!models) return { favModels: [], otherModels: [] };
+    return {
+      favModels: models.filter((m) => favoriteIds.has(m.id)).sort((a, b) => a.name.localeCompare(b.name)),
+      otherModels: models.filter((m) => !favoriteIds.has(m.id)).sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }, [models, favoriteIds]);
 
   const handleSave = async () => {
     setNameError('');
@@ -102,7 +111,7 @@ export function PromptAccordionItem({
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={prompt.isSystem}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+              className={`w-full disabled:bg-gray-100 disabled:text-gray-500 ${inputClass}`}
             />
             {nameError && <p className="text-xs text-red-600 mt-1">{nameError}</p>}
           </div>
@@ -125,7 +134,7 @@ export function PromptAccordionItem({
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                className={`w-full bg-white ${inputClass}`}
               >
                 {/* Always show current model if not in list */}
                 {models && !models.some((m) => m.id === model) && (
@@ -133,28 +142,20 @@ export function PromptAccordionItem({
                 )}
                 {models ? (
                   <>
-                    {(() => {
-                      const favModels = models.filter((m) => favoriteIds.has(m.id)).sort((a, b) => a.name.localeCompare(b.name));
-                      const otherModels = models.filter((m) => !favoriteIds.has(m.id)).sort((a, b) => a.name.localeCompare(b.name));
-                      return (
-                        <>
-                          {favModels.length > 0 && (
-                            <optgroup label="Favorites">
-                              {favModels.map((m) => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {otherModels.length > 0 && (
-                            <optgroup label="All Models">
-                              {otherModels.map((m) => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                        </>
-                      );
-                    })()}
+                    {favModels.length > 0 && (
+                      <optgroup label="Favorites">
+                        {favModels.map((m) => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {otherModels.length > 0 && (
+                      <optgroup label="All Models">
+                        {otherModels.map((m) => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </>
                 ) : (
                   <option value={model}>{model}</option>
@@ -171,7 +172,7 @@ export function PromptAccordionItem({
               onChange={(e) => setText(e.target.value)}
               disabled={prompt.isSystem}
               rows={6}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500 resize-y"
+              className={`w-full disabled:bg-gray-100 disabled:text-gray-500 resize-y ${inputClass}`}
             />
             {textError && <p className="text-xs text-red-600 mt-1">{textError}</p>}
           </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useReducer } from 'react';
 import { validateApiKeyFormat, validateApiKeyServer } from '../services/apiKeyValidation';
 import { saveApiKey, loadApiKey } from '../services/storage';
-import { Spinner, BackButton } from './ui';
+import { Spinner, BackButton, NavButton, inputClass } from './ui';
 
 type Phase = 'idle' | 'editing' | 'testing' | 'test-passed' | 'test-failed' | 'saving' | 'saved';
 
@@ -140,7 +140,7 @@ export function Settings({ onBack, onKeySaved, onManageFavoriteModels, onManageP
             onFocus={handleFocus}
             onBlur={() => setIsFocused(false)}
             placeholder="sk-or-..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={`w-full placeholder-gray-400 ${inputClass}`}
             disabled={form.phase === 'testing' || form.phase === 'saving'}
           />
         </div>
@@ -214,31 +214,13 @@ export function Settings({ onBack, onKeySaved, onManageFavoriteModels, onManageP
         {/* Manage Favorite Models */}
         <div className="pt-4 border-t border-gray-200">
           <label className="block text-sm font-medium text-gray-700 mb-2">Models</label>
-          <button
-            type="button"
-            onClick={onManageFavoriteModels}
-            className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 hover:bg-gray-50 transition-colors"
-          >
-            <span>Manage Favorite Models</span>
-            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+          <NavButton label="Manage Favorite Models" onClick={onManageFavoriteModels} />
         </div>
 
         {/* Manage Prompts */}
         <div className="pt-4 border-t border-gray-200">
           <label className="block text-sm font-medium text-gray-700 mb-2">Prompts</label>
-          <button
-            type="button"
-            onClick={onManagePrompts}
-            className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 hover:bg-gray-50 transition-colors"
-          >
-            <span>Manage Prompts</span>
-            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+          <NavButton label="Manage Prompts" onClick={onManagePrompts} />
         </div>
 
         {/* Help Link */}

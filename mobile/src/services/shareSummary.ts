@@ -5,18 +5,18 @@ export interface ShareContent {
   title: string;
   summary: string;
   url: string;
+  model: string;
 }
 
 export function formatShareText(content: ShareContent): string {
-  return `${content.title}\n\n${content.summary}\n\n${content.url}`;
+  return `**Title:** ${content.title}\n**URL:** ${content.url}\n**Model:** ${content.model}\n\n${content.summary}`;
 }
 
 export async function shareSummary(content: ShareContent): Promise<void> {
   try {
     await Share.share({
       title: content.title,
-      text: content.summary,
-      url: content.url,
+      text: formatShareText(content),
       dialogTitle: 'Share Summary',
     });
   } catch (error) {

@@ -10,6 +10,7 @@ export interface SummaryResult {
   summary: string;
   title: string;
   url: string;
+  model: string;
 }
 
 export type SummarizationState = 'idle' | 'fetching-transcript' | 'streaming' | 'done' | 'error';
@@ -46,10 +47,16 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
   const [hasReceivedFirstChunk, setHasReceivedFirstChunk] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const stopRef = useRef(false);
-  const titleRef = useRef('');
-  const targetUrlRef = useRef('');
+  const contextRef = useRef({ title: '', url: '', model: '' });
 
   const bufferedMarkdown = useBufferedMarkdown();
+
+  const makeSummaryResult = (summary: string): SummaryResult => ({
+    summary,
+    title: contextRef.current.title,
+    url: contextRef.current.url,
+    model: contextRef.current.model,
+  });
 
   const handleSummarize = useCallback(async (urlOverride?: string) => {
     if (!apiKey) {
@@ -69,6 +76,7 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
     const prompt = selectedPromptId ? await getPromptById(selectedPromptId) : null;
     const promptText = prompt?.text ?? '{{transcript}}';
     const model = modelOverride ?? prompt?.model ?? config.defaultModel;
+    contextRef.current.model = model;
 
     // Cancel any in-flight request
     abortRef.current?.abort();
@@ -82,8 +90,7 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
     setHasReceivedFirstChunk(false);
     bufferedMarkdown.reset();
 
-    const targetUrl = (urlOverride ?? url).trim();
-    targetUrlRef.current = targetUrl;
+    contextRef.current.url = (urlOverride ?? url).trim();
 
     // Phase 1: Fetch transcript
     setState('fetching-transcript');
@@ -102,7 +109,7 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
       return;
     }
 
-    titleRef.current = transcriptResult.data.title;
+    contextRef.current.title = transcriptResult.data.title;
 
     // Phase 2: Stream summary
     setState('streaming');
@@ -121,21 +128,13 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
           },
           onComplete: (fullContent) => {
             bufferedMarkdown.flush();
-            setSummaryResult({
-              summary: fullContent,
-              title: titleRef.current,
-              url: targetUrlRef.current,
-            });
+            setSummaryResult(makeSummaryResult(fullContent));
             setState('done');
           },
           onError: (error, partialContent, errorDetails) => {
             bufferedMarkdown.flush();
             if (partialContent) {
-              setSummaryResult({
-                summary: partialContent,
-                title: titleRef.current,
-                url: targetUrlRef.current,
-              });
+              setSummaryResult(makeSummaryResult(partialContent));
             }
             setState('error');
             const baseMessage = ERROR_MESSAGES[error] ?? 'Failed to generate summary.';
@@ -154,12 +153,7 @@ export function useSummarization({ url, apiKey, selectedPromptId, modelOverride 
           bufferedMarkdown.flush();
           const partialContent = bufferedMarkdown.getFullContent();
           if (partialContent) {
-            const stoppedContent = partialContent + '\n\n---\n*Summary stopped by user*';
-            setSummaryResult({
-              summary: stoppedContent,
-              title: titleRef.current,
-              url: targetUrlRef.current,
-            });
+            setSummaryResult(makeSummaryResult(partialContent + '\n\n---\n*Summary stopped by user*'));
           }
           setState('done');
         }
