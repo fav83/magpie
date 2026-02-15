@@ -188,59 +188,21 @@ $ADB shell pm clear com.magpie.app
 
 ### Reusable UI Parser Helper
 
-Define this once at the start of the session. It parses `uiautomator dump` XML into a readable list of interactive elements:
+Define a `parse_ui` shell function at the start of the session. It should:
 
-```bash
-parse_ui() {
-  python3 -c "
-import sys, xml.etree.ElementTree as ET
-xml = sys.stdin.read()
-start = xml.find('<?xml')
-if start == -1: start = xml.find('<hierarchy')
-root = ET.fromstring(xml[start:])
-for node in root.iter():
-    text = node.get('text','')
-    desc = node.get('content-desc','')
-    cls = node.get('class','').split('.')[-1]
-    bounds = node.get('bounds','')
-    hint = node.get('hint','')
-    enabled = node.get('enabled','')
-    if text or desc or hint:
-        info = f'{cls} bounds={bounds}'
-        if text: info += f' text={repr(text[:100])}'
-        if desc: info += f' desc={repr(desc[:60])}'
-        if hint: info += f' hint={repr(hint)}'
-        if enabled == 'false': info += ' DISABLED'
-        print(info)
-"
-}
-
-# Usage:
-$ADB shell "uiautomator dump /sdcard/ui.xml && cat /sdcard/ui.xml" 2>/dev/null | parse_ui
-```
+1. Pipe output from `$ADB shell "uiautomator dump /sdcard/ui.xml && cat /sdcard/ui.xml"` into a Python script
+2. Find the XML start (`<?xml` or `<hierarchy`), parse it with `xml.etree.ElementTree`
+3. For each node with `text`, `content-desc`, or `hint`: print the class name, bounds, and those attributes. Mark disabled elements.
+4. Handle errors gracefully — if no XML is found or parsing fails, print a clear error message instead of silently returning nothing
 
 ### Reusable Streaming Wait Loop
 
-Polls the UI tree every 3 seconds until the "Summarize" button reappears (meaning streaming is done) or times out:
+Define a `wait_for_done` shell function that polls the UI tree every 3 seconds to detect when summarization streaming has completed:
 
-```bash
-wait_for_done() {
-  for i in $(seq 1 40); do
-    sleep 3
-    result=$($ADB shell "uiautomator dump /sdcard/ui.xml && cat /sdcard/ui.xml" 2>/dev/null | python3 -c "
-import sys, xml.etree.ElementTree as ET
-xml = sys.stdin.read()
-start = xml.find('<?xml'); root = ET.fromstring(xml[start:])
-for n in root.iter():
-    t = n.get('text','')
-    if t == 'Summarize': print('DONE'); break
-    if t in ('Stop','Stop generating'): print('STREAMING'); break
-")
-    if [ "$result" = "DONE" ]; then echo "Done after ${i}x3s"; return 0; fi
-  done
-  echo "TIMEOUT"; return 1
-}
-```
+- **Done signal:** The "Summarize" button reappears in the UI tree
+- **Still streaming:** A "Stop" or "Stop generating" button is present
+- **Timeout:** 120 seconds (40 polls) — log as failure
+- **Error recovery:** Track consecutive empty or failed poll results. After 5 in a row, take a diagnostic screenshot and fail immediately instead of spinning for the full timeout
 
 ### Field Clearing Patterns
 
@@ -1010,6 +972,8 @@ All screenshots are saved to `docs/e2e-screenshots/` with naming convention:
 - **Keyboard dismissal:** After typing in text fields, the soft keyboard may cover lower UI elements. Use `keyevent 4` (BACK) to dismiss the keyboard before interacting with buttons below.
 - **Dynamic content:** Model lists and YouTube search results are dynamic. Assertions should check for the presence of elements and general patterns, not exact text matches (except for known values like prompt names).
 - **Token budget:** Be economical with screenshots. The runbook specifies approximately 12-15 screenshots across all 48 scenarios. Use the UI tree dump for all other assertions.
+- **Inline Python:** Never use `python3 -c "..."` — always use heredoc (`python3 << 'PYEOF'`). Double-quoted inline Python causes shell escaping bugs where operators like `!=` get mangled into `\!=`, producing silent `SyntaxError` on every poll iteration.
+- **Polling robustness:** All polling loops must fail fast on repeated errors. If 5 consecutive polls return empty or error results, take a diagnostic screenshot and abort — never spin the full loop on broken output.
 - **Chat streaming:** See [Chat Response Polling](#chat-response-polling) below for the correct polling strategy. Do NOT reuse `wait_for_done` directly — chat completion signals differ from summarization.
 
 ### Chat Response Polling
@@ -1024,3 +988,5 @@ The chat feature uses the same SSE streaming infrastructure as summarization, bu
 - **Response complete:** Stop button is gone AND new substantial text content (>50 chars) is present in the chat area
 - **Timeout:** 120 seconds — log as failure
 - **ConfirmDialogs:** CSS modal overlays are invisible to `uiautomator dump`. Use screenshots to verify they appeared, then tap at known coordinates (Cancel: ~666,1332 / Confirm: ~882,1332).
+
+Chat polling must apply the same error recovery as `wait_for_done` — fail fast after 5 consecutive empty/error polls with a diagnostic screenshot.
