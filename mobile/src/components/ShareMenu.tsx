@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 
 interface ShareMenuProps {
   onCopy: () => void;
@@ -8,9 +9,8 @@ interface ShareMenuProps {
 
 export function ShareMenu({ onCopy, onShare, onShareWithChat }: ShareMenuProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { copied: copySuccess, showCopied } = useCopyToClipboard();
 
   // Close on outside click
   useEffect(() => {
@@ -24,18 +24,9 @@ export function ShareMenu({ onCopy, onShare, onShareWithChat }: ShareMenuProps):
     return () => document.removeEventListener('pointerdown', handleClick);
   }, [open]);
 
-  useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, []);
-
   const handleCopy = () => {
     onCopy();
-    setCopySuccess(true);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      setCopySuccess(false);
-      timerRef.current = null;
-    }, 1500);
+    showCopied();
     setOpen(false);
   };
 

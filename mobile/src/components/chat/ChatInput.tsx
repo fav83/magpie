@@ -31,7 +31,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Eleme
         }}
         placeholder="Ask about this video..."
         disabled={disabled}
-        className="flex-1 min-w-0 rounded-full border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+        className="flex-1 min-w-0 rounded-full border border-gray-300 px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
       />
       <button
         type="button"
@@ -40,7 +40,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Eleme
           handleSend();
         }}
         disabled={disabled || !text.trim()}
-        className="shrink-0 w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center disabled:opacity-40 transition-opacity"
+        className="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center disabled:opacity-40 transition-opacity"
         aria-label="Send message"
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

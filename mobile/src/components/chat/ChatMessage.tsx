@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
 import Markdown from 'react-markdown';
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard';
 import type { ChatMessage as ChatMessageType } from '../../types/chat';
 
 interface ChatMessageProps {
@@ -8,25 +8,23 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message, streamingContent }: ChatMessageProps): React.JSX.Element {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const isUser = message.role === 'user';
   const isStreaming = message.status === 'streaming';
   const isError = message.status === 'error';
   const displayContent = isStreaming ? (streamingContent ?? '') : message.content;
 
-  const handleCopy = useCallback(async () => {
+  const handleCopy = () => {
     if (!displayContent) return;
-    await navigator.clipboard.writeText(displayContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }, [displayContent]);
+    copy(displayContent);
+  };
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <button
         type="button"
-        onClick={() => void handleCopy()}
-        className={`relative max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm text-left ${
+        onClick={handleCopy}
+        className={`relative max-w-[85%] rounded-2xl px-3.5 py-2.5 text-left ${
           isUser
             ? 'bg-blue-600 text-white rounded-br-md'
             : 'bg-gray-100 text-gray-800 rounded-bl-md'
@@ -35,7 +33,7 @@ export function ChatMessage({ message, streamingContent }: ChatMessageProps): Re
         {isUser ? (
           <p className="whitespace-pre-wrap">{displayContent}</p>
         ) : (
-          <div className="prose prose-sm max-w-none">
+          <div className="prose max-w-none">
             <Markdown>{displayContent}</Markdown>
             {isStreaming && <span className="animate-blink text-gray-400">&#9610;</span>}
           </div>

@@ -1,5 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard';
+import { formatChatConversation } from '../../utils/formatChat';
 import type { ChatMessage } from '../../types/chat';
 
 interface ChatHeaderProps {
@@ -7,39 +9,69 @@ interface ChatHeaderProps {
   onClear: () => void;
 }
 
-function formatConversation(messages: ChatMessage[]): string {
-  return messages
-    .map((m) => `${m.role === 'user' ? 'You' : 'Assistant'}: ${m.content}`)
-    .join('\n\n');
-}
-
 export function ChatHeader({ messages, onClear }: ChatHeaderProps): React.JSX.Element {
-  const [copied, setCopied] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { copied, copy } = useCopyToClipboard();
 
-  const handleCopyAll = useCallback(async () => {
-    await navigator.clipboard.writeText(formatConversation(messages));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }, [messages]);
+  const handleCopyAll = () => {
+    copy(formatChatConversation(messages));
+    setMenuOpen(false);
+  };
+
+  // Close menu on outside tap
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleTap = (e: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleTap);
+    return () => document.removeEventListener('pointerdown', handleTap);
+  }, [menuOpen]);
 
   return (
     <>
-      <div className="flex items-center justify-end gap-2 mb-2">
+      <div ref={menuRef} className="relative">
         <button
           type="button"
-          onClick={() => void handleCopyAll()}
-          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded transition-colors"
+          onClick={() => setMenuOpen((v) => !v)}
+          className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label="Chat actions"
         >
-          {copied ? 'Copied!' : 'Copy all'}
+          {copied ? (
+            <svg className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="12" cy="19" r="1.5" />
+            </svg>
+          )}
         </button>
-        <button
-          type="button"
-          onClick={() => setShowConfirm(true)}
-          className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded transition-colors"
-        >
-          Clear
-        </button>
+
+        {menuOpen && (
+          <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-20 min-w-[120px]">
+            <button
+              type="button"
+              onClick={handleCopyAll}
+              className="w-full text-left text-sm text-gray-700 hover:bg-gray-100 px-3 py-2"
+            >
+              Copy all
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMenuOpen(false); setShowConfirm(true); }}
+              className="w-full text-left text-sm text-red-600 hover:bg-gray-100 px-3 py-2"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
       {showConfirm && (

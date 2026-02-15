@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-
-const COPY_SUCCESS_DURATION_MS = 2000;
+import { useState, useEffect } from 'react';
+import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 
 interface SpeedDialFABProps {
   visible: boolean;
@@ -52,27 +51,15 @@ const ShareIcon = ({ className }: { className: string }) => (
 
 export function SpeedDialFAB({ visible, onShare, onCopy, onShareWithChat }: SpeedDialFABProps): React.JSX.Element {
   const [fabOpen, setFabOpen] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { copied: copySuccess, showCopied, reset: resetCopy } = useCopyToClipboard();
 
   // Reset state when FAB becomes hidden
   useEffect(() => {
     if (!visible) {
       setFabOpen(false);
-      setCopySuccess(false);
-      if (copyTimerRef.current) {
-        clearTimeout(copyTimerRef.current);
-        copyTimerRef.current = null;
-      }
+      resetCopy();
     }
-  }, [visible]);
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-    };
-  }, []);
+  }, [visible, resetCopy]);
 
   const handleShare = () => {
     setFabOpen(false);
@@ -87,12 +74,7 @@ export function SpeedDialFAB({ visible, onShare, onCopy, onShareWithChat }: Spee
   const handleCopy = () => {
     setFabOpen(false);
     onCopy();
-    setCopySuccess(true);
-    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-    copyTimerRef.current = setTimeout(() => {
-      setCopySuccess(false);
-      copyTimerRef.current = null;
-    }, COPY_SUCCESS_DURATION_MS);
+    showCopied();
   };
 
   const copyIcon = copySuccess ? (

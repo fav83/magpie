@@ -48,6 +48,17 @@ export function Settings({ onBack, onKeySaved, onManageFavoriteModels, onManageP
             className={`w-full placeholder-gray-400 ${inputClass}`}
             disabled={form.phase === 'testing' || form.phase === 'saving'}
           />
+          <p className="mt-1 text-sm text-gray-500">
+            <span>Don't have a key? </span>
+            <a
+              href="https://openrouter.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 underline"
+            >
+              Get one at openrouter.ai
+            </a>
+          </p>
         </div>
 
         {/* Buttons */}
@@ -158,18 +169,6 @@ export function Settings({ onBack, onKeySaved, onManageFavoriteModels, onManageP
           <NavButton label="Manage Prompts" onClick={onManagePrompts} />
         </div>
 
-        {/* Help Link */}
-        <div className="pt-4 text-sm text-gray-500">
-          <span>Don't have a key? </span>
-          <a
-            href="https://openrouter.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline"
-          >
-            Get one at openrouter.ai
-          </a>
-        </div>
       </div>
     </div>
   );

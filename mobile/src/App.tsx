@@ -17,6 +17,8 @@ import { ShareMenu } from './components/ShareMenu';
 import { Spinner, inputClass } from './components/ui';
 import { ChatSection } from './components/chat/ChatSection';
 import { useVideoChat } from './hooks/useVideoChat';
+import { useAutoScroll } from './hooks/useAutoScroll';
+import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 
 type Page = 'main' | 'settings' | 'manage-prompts' | 'manage-favorite-models';
 
@@ -53,6 +55,7 @@ export function App(): React.JSX.Element {
   const {
     state,
     summaryResult,
+    title,
     displayContent,
     errorMessage,
     setErrorMessage,
@@ -73,10 +76,6 @@ export function App(): React.JSX.Element {
   // Keep a stable ref to handleSummarize for share intent auto-trigger
   const handleSummarizeRef = useRef(handleSummarize);
   handleSummarizeRef.current = handleSummarize;
-
-  // Auto-scroll state
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const userScrolledUpRef = useRef(false);
 
   // useShareIntent wraps callbacks in refs internally, so closures stay fresh
   const { pendingShareUrl, consumePendingUrl } = useShareIntent({
@@ -117,42 +116,25 @@ export function App(): React.JSX.Element {
     }
   }, [pendingShareUrl, apiKey, prompts, consumePendingUrl]);
 
-  // Track manual scroll-up
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+  // Auto-scroll for streaming content
+  const scrollContainerRef = useAutoScroll({
+    summaryStreaming: state === 'streaming',
+    summaryContent: displayContent,
+    chatStreaming: chat.isStreaming,
+    chatContent: chat.streamingDisplayContent,
+    state,
+  });
 
-    const handleScroll = () => {
-      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-      userScrolledUpRef.current = distanceFromBottom > 50;
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Auto-scroll on new streaming content (summary or chat)
-  useEffect(() => {
-    const isSummaryStreaming = state === 'streaming' && displayContent;
-    const isChatStreaming = chat.isStreaming && chat.streamingDisplayContent;
-    if ((isSummaryStreaming || isChatStreaming) && !userScrolledUpRef.current) {
-      const container = scrollContainerRef.current;
-      if (container) {
-        requestAnimationFrame(() => {
-          container.scrollTop = container.scrollHeight;
-        });
-      }
-    }
-  }, [displayContent, state, chat.isStreaming, chat.streamingDisplayContent]);
-
-  // Reset scroll tracking and chat on new summarization
+  // Reset chat on new summarization
   useEffect(() => {
     if (state === 'fetching-transcript') {
-      userScrolledUpRef.current = false;
       chat.reset();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only trigger on state change
   }, [state]);
+
+  // Android hardware back button
+  useHardwareBackButton(currentPage, setCurrentPage, { reloadFavorites, loadPromptData });
 
   const favoriteModels = useMemo(
     () => (models ?? []).filter((m) => favoriteIds.has(m.id)).sort((a, b) => a.name.localeCompare(b.name)),
@@ -326,12 +308,12 @@ export function App(): React.JSX.Element {
 
         {/* Streaming content */}
         {isSummaryStreaming && hasReceivedFirstChunk && (
-          <SummaryView summary={displayContent} isStreaming />
+          <SummaryView summary={displayContent} title={title} isStreaming />
         )}
 
         {/* Error with possible partial content */}
         {state === 'error' && summaryResult && (
-          <SummaryView summary={summaryResult.summary} />
+          <SummaryView summary={summaryResult.summary} title={summaryResult.title} />
         )}
 
         {/* Error banner — show for both validation errors (idle state) and runtime errors */}
@@ -344,7 +326,7 @@ export function App(): React.JSX.Element {
         )}
 
         {/* Completed summary */}
-        {state === 'done' && summaryResult && <SummaryView summary={summaryResult.summary} />}
+        {state === 'done' && summaryResult && <SummaryView summary={summaryResult.summary} title={summaryResult.title} />}
 
         {/* Chat section — available after summary completes */}
         {state === 'done' && summaryResult && (
@@ -355,7 +337,6 @@ export function App(): React.JSX.Element {
             streamingDisplayContent={chat.streamingDisplayContent}
             onSend={chat.sendMessage}
             onToggleExpanded={chat.toggleExpanded}
-            onCancelStreaming={chat.cancelStreaming}
             onClear={chat.clearChat}
           />
         )}

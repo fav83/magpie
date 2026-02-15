@@ -1,6 +1,7 @@
 import { config, openRouterHeaders, DEFAULT_CHAT_SYSTEM_PROMPT } from '../config';
 import { logError } from '../utils/logger';
 import { parseSSEStream } from './sseParser';
+import { extractErrorDetails } from './apiErrorUtils';
 import type { StreamCallbacks, SummaryError } from './streamingOpenrouter';
 
 export type { StreamCallbacks, SummaryError };
@@ -8,34 +9,6 @@ export type { StreamCallbacks, SummaryError };
 interface ChatApiMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
-}
-
-/**
- * Extract error message from OpenRouter error response.
- */
-function extractErrorDetails(errorBody: string): string | undefined {
-  try {
-    const parsed = JSON.parse(errorBody) as {
-      error?: {
-        message?: string;
-        metadata?: { raw?: string };
-      };
-    };
-
-    if (parsed.error?.metadata?.raw) {
-      try {
-        const rawParsed = JSON.parse(parsed.error.metadata.raw) as { message?: string };
-        if (rawParsed.message) return rawParsed.message;
-      } catch {
-        if (parsed.error.metadata.raw.length < 200) return parsed.error.metadata.raw;
-      }
-    }
-
-    return parsed.error?.message;
-  } catch {
-    if (errorBody && errorBody.length < 200) return errorBody;
-    return undefined;
-  }
 }
 
 function buildSystemMessage(summary: string, transcript: string): string {

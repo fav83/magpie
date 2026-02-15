@@ -35,8 +35,8 @@ export function ConfirmDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 outline-none"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
-      <div className="bg-white rounded-xl shadow-lg mx-6 p-5 max-w-sm w-full">
-        <h2 className="text-base font-semibold text-gray-900 mb-2">{title}</h2>
+      <div role="dialog" aria-labelledby="confirm-dialog-title" className="bg-white rounded-xl shadow-lg mx-6 p-5 max-w-sm w-full">
+        <h2 id="confirm-dialog-title" className="text-base font-semibold text-gray-900 mb-2">{title}</h2>
         <p className="text-sm text-gray-600 mb-5">{message}</p>
         <div className="flex gap-3 justify-end">
           <button
