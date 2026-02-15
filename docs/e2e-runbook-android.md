@@ -249,6 +249,12 @@ What `uiautomator dump` can and cannot see:
 - Cancel: `~(666, 1332)`
 - Confirm/Delete: `~(882, 1332)`
 
+### Font Scale Assertion
+
+The font size slider updates a React state label (e.g., "150%") and applies CSS scaling to the rendered UI. These are two separate things — the label can update while CSS scaling is completely broken.
+
+To verify scaling actually works, record the UI tree bounds of a reference text element (e.g., "Manage Favorite Models" button) **before** and **after** dragging the slider. Compute the height delta numerically. A 50%+ font size increase must produce a measurable height increase in element bounds. **If bounds are identical, FAIL — no exceptions.** Do not attribute identical bounds to a "WebView limitation." If the UI tree reports the same bounds, the text did not scale.
+
 ### Known Tap Coordinates
 
 These are approximate and depend on font size being 100%:
@@ -436,7 +442,8 @@ Scenario T-06: Adjust font size via slider
   Then the current font size displays as "100%"
   When the user drags the slider to increase the font size (e.g., to 150%)
   Then the percentage label updates to reflect the new value
-    And the app text visibly grows larger
+    And the rendered UI is visually different — text is larger on screen
+    # Assertion method: see "Font Scale Assertion" in ADB Toolkit
     # Screenshot: Settings screen with enlarged font size
 
 Scenario T-07: Font size persists across app restart
@@ -445,7 +452,8 @@ Scenario T-07: Font size persists across app restart
     And relaunches it
     And navigates to Settings
   Then the font size slider shows the previously set value (not 100%)
-    And the app text is still at the adjusted size
+    And the rendered UI matches the enlarged state from T-06, not the 100% baseline
+    # Assertion method: see "Font Scale Assertion" in ADB Toolkit
 
 Scenario T-08: Reset font size to default
   Given the font size is set to a non-default value
@@ -453,7 +461,8 @@ Scenario T-08: Reset font size to default
   When the user taps the "Reset" link
   Then the font size returns to 100%
     And the "Reset" link disappears
-    And the app text returns to normal size
+    And the rendered UI matches the original 100% baseline from T-06
+    # Assertion method: see "Font Scale Assertion" in ADB Toolkit
 ```
 
 ---
